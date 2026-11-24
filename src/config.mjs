@@ -15,7 +15,7 @@ function xdg(name, fallback, env) {
   return env[name] || path.join(env.HOME || os.homedir(), fallback);
 }
 
-// 0.0.0.0 で待ち受けるとき、Kindle から見えそうな LAN 側の IPv4 を探す（資料の URL に使う）
+// 0.0.0.0 で待ち受けるとき、端末から見えそうな LAN 側の IPv4 を探す（資料の URL に使う）
 export function guessLanAddress(interfaces = os.networkInterfaces()) {
   const skip = /^(lo|docker|br-|veth|virbr|tailscale|tun|tap|wg|zt|utun|cni|flannel|cali)/;
   const candidates = [];
@@ -33,8 +33,26 @@ export function guessLanAddress(interfaces = os.networkInterfaces()) {
 
 const bracket = (h) => (h.includes(":") ? `[${h}]` : h);
 
+export function isLoopback(host) {
+  return host === "localhost" || host === "::1" || /^127\./.test(host || "");
+}
+
+// サーバーの status から、端末から開けない設定（このマシンからしか届かない）かどうかを判断する
+export function deviceUnreachable(status) {
+  if (!status || !isLoopback(status.host)) return false;
+  try {
+    return !status.publicUrl || isLoopback(new URL(status.publicUrl).hostname.replace(/^\[|\]$/g, ""));
+  } catch {
+    return true;
+  }
+}
+
+export const DEVICE_HINT =
+  "The server listens only on this machine, so the handwriting device cannot open it. " +
+  "To open it from the device, restart the server with --host 0.0.0.0 (for example, add the flag to the MCP server's command line).";
+
 export function config(opts = {}, env = process.env) {
-  const host = opts.host || "0.0.0.0";
+  const host = opts.host || "127.0.0.1";
   const port = Number(opts.port || 8470);
   const wildcard = host === "0.0.0.0" || host === "::";
   const local = wildcard ? "127.0.0.1" : host;

@@ -16,10 +16,10 @@
 //   scribe-loop wait [--pending] [--timeout 秒]  新しいフィードバックが届くまで待つ（届いたら ID を出して終わる）
 //
 // どのコマンドにも付けられるフラグ:
-//   --host <addr>        待ち受けるアドレス（既定 0.0.0.0）
+//   --host <addr>        待ち受けるアドレス（既定 127.0.0.1。端末から開くには 0.0.0.0 など）
 //   --port <port>        待ち受けるポート（既定 8470）
 //   --data-dir <dir>     データの置き場所（既定 $XDG_DATA_HOME/scribe-loop）
-//   --public-url <url>   Kindle から見たサーバーの URL（既定は LAN 側の IP から推測）
+//   --public-url <url>   端末から見たサーバーの URL（既定は LAN 側の IP から推測）
 //   --chrome <path>      合成画像を作るときに使う Chrome / Chromium
 //   --url <url>          別のマシンで動いているサーバーを使う（このときは自分では起動しない）
 //
@@ -28,7 +28,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { config, SERVER_OPTIONS } from "../src/config.mjs";
+import { config, SERVER_OPTIONS, deviceUnreachable, DEVICE_HINT } from "../src/config.mjs";
 import { Client, describeFeedback } from "../src/client.mjs";
 import { ensureServer, stopServer, probe, logFile } from "../src/daemon.mjs";
 
@@ -68,16 +68,23 @@ try {
 }
 const cfg = config(values);
 
+let hinted = false;
+
 // サーバーにつながらなかったときだけ、起動してからやり直す
 async function ensure() {
   const { status, started } = await ensureServer(cfg);
   if (started) console.error(`scribe-loop: サーバーを起動しました ${status.publicUrl || cfg.serverUrl}（pid ${status.pid}）`);
+  if (started && deviceUnreachable(status)) {
+    console.error(`scribe-loop: ${DEVICE_HINT}`);
+    hinted = true;
+  }
 }
 
 function printStatus(status) {
   console.log(`running\tpid ${status.pid}\tversion ${status.version}\tsince ${status.startedAt}`);
   console.log(`listen\t${status.host}:${status.port}`);
-  if (status.publicUrl) console.log(`device\t${status.publicUrl}/`);
+  if (deviceUnreachable(status)) console.log(`device\t(unreachable) ${DEVICE_HINT}`);
+  else if (status.publicUrl) console.log(`device\t${status.publicUrl}/`);
   console.log(`data\t${status.dataDir}`);
   console.log(`log\t${logFile(cfg)}`);
 }
@@ -128,6 +135,7 @@ async function main() {
       const html = fs.readFileSync(positionals[0] === "-" ? 0 : positionals[0], "utf8");
       const meta = await client.pushDocument({ title: values.title, html, inReplyTo: values["reply-to"] });
       console.log(`${meta.id}\t${meta.title}\t${meta.url}`);
+      if (!hinted && deviceUnreachable(await probe(cfg.serverUrl))) console.error(`scribe-loop: ${DEVICE_HINT}`);
       return;
     }
     case "revise": {

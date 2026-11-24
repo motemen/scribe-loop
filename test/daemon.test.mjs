@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { config, guessLanAddress } from "../src/config.mjs";
+import { config, deviceUnreachable, guessLanAddress } from "../src/config.mjs";
 import { ensureServer, stopServer, probe } from "../src/daemon.mjs";
 
 test("ensureServer starts a detached server once with the same flags, and stopServer stops it", async () => {
@@ -24,12 +24,24 @@ test("ensureServer starts a detached server once with the same flags, and stopSe
   assert.equal(await probe(cfg.serverUrl), null);
 });
 
-test("defaults: listen on all interfaces, call locally, guess the LAN address for Kindle URLs", () => {
+test("defaults: listen only on this machine", () => {
   const cfg = config({}, { HOME: "/home/x" });
-  assert.equal(cfg.host, "0.0.0.0");
+  assert.equal(cfg.host, "127.0.0.1");
   assert.equal(cfg.serverUrl, "http://127.0.0.1:8470");
   assert.equal(cfg.dataDir, "/home/x/.local/share/scribe-loop");
   assert.equal(cfg.autostart, true);
+});
+
+test("--host 0.0.0.0 calls locally and guesses the LAN address for device URLs", () => {
+  const cfg = config({ host: "0.0.0.0" }, { HOME: "/home/x" });
+  assert.equal(cfg.serverUrl, "http://127.0.0.1:8470");
+  assert.ok(cfg.serveArgs.includes("0.0.0.0"));
+});
+
+test("deviceUnreachable is true only for a loopback server without a public URL", () => {
+  assert.equal(deviceUnreachable({ host: "127.0.0.1", publicUrl: "http://127.0.0.1:8470" }), true);
+  assert.equal(deviceUnreachable({ host: "127.0.0.1", publicUrl: "https://scribe.example.com" }), false);
+  assert.equal(deviceUnreachable({ host: "0.0.0.0", publicUrl: "http://192.168.1.2:8470" }), false);
 });
 
 test("--url points at another machine and disables autostart", () => {

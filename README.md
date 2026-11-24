@@ -38,7 +38,7 @@ The UI labels are in Japanese.
 
 ## Server
 
-Requires Node.js 20 or later. The server has no package dependencies. There is no authentication, and by default it listens on all interfaces (`0.0.0.0`), so use it only on a trusted LAN.
+Requires Node.js 20 or later. The server has no package dependencies. There is no authentication. By default it listens only on this machine (`127.0.0.1`), which the device cannot reach; to open it from the device, pass `--host 0.0.0.0` and use it only on a trusted LAN.
 
 You do not need to start the server beforehand. When a `scribe-loop` command (such as `push` or `mcp`) gets no response from the server, it starts the server in the background with the same flags and then continues.
 
@@ -52,7 +52,7 @@ scribe-loop restart         # e.g. after updating
 scribe-loop serve           # run in the foreground (for debugging)
 ```
 
-On the device, open the URL shown by `scribe-loop status` (`http://<the server's LAN IP>:8470/`) and bookmark it.
+With `--host 0.0.0.0`, open the URL shown by `scribe-loop status` on the device (`http://<the server's LAN IP>:8470/`) and bookmark it.
 
 The server is not registered as a system service, so it stops when the machine restarts. After a restart, run any command once or open a Claude Code session to bring it back (when the session starts the MCP server, the MCP server starts the server).
 
@@ -62,7 +62,7 @@ All settings are command-line flags. Every command accepts them and passes them 
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--host` | `0.0.0.0` | Address to listen on |
+| `--host` | `127.0.0.1` | Address to listen on. Use `0.0.0.0` to open it from the device |
 | `--port` | `8470` | Port to listen on |
 | `--data-dir` | `$XDG_DATA_HOME/scribe-loop` | Where documents, handwriting, and feedback are stored |
 | `--public-url` | guessed from the LAN IP | The server URL as seen from the device, used in document URLs returned to the agent |
@@ -79,10 +79,10 @@ There are an MCP server (stdio) and a CLI. Both call the server given by the fla
 
 ### MCP
 
-Register it with Claude Code as follows. Add flags after `mcp` (for example, `mcp --port 8480`).
+Register it with Claude Code as follows. Flags go after `mcp`; `--host 0.0.0.0` lets the device reach the server the MCP server starts.
 
 ```sh
-claude mcp add -s user scribe-loop -- npx -y @motemen/scribe-loop mcp
+claude mcp add -s user scribe-loop -- npx -y @motemen/scribe-loop mcp --host 0.0.0.0
 ```
 
 | Tool | Description |

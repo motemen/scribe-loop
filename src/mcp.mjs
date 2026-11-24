@@ -4,6 +4,8 @@ import readline from "node:readline";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client, describeFeedback, AGENT_GUIDE } from "./client.mjs";
+import { deviceUnreachable, DEVICE_HINT } from "./config.mjs";
+import { probe } from "./daemon.mjs";
 
 const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "scribe-loop.mjs");
 
@@ -106,7 +108,8 @@ async function callTool(client, name, args) {
       return [
         text(
           `Pushed: ${meta.title} (${meta.id})\nIt appears in the document list on the device. ${meta.url}\n` +
-            `To wait for the user's handwritten feedback in a session that does not receive channel events, run this in the background: ${waitCommand(cfgRef)}`,
+            `To wait for the user's handwritten feedback in a session that does not receive channel events, run this in the background: ${waitCommand(cfgRef)}` +
+            (deviceUnreachable(await probe(cfgRef.serverUrl)) ? `\nNote for the user: ${DEVICE_HINT}` : ""),
         ),
       ];
     }
