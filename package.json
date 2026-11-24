@@ -1,5 +1,6 @@
 {
   "name": "scribe-loop",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Kindle Scribe の標準ブラウザで、AI エージェントの資料を読み、手書きで返すための環境",

@@ -1,16 +1,26 @@
 // CLI と MCP サーバーから、scribe-loop のサーバーを呼ぶ。
 
 export class Client {
-  constructor(baseUrl) {
+  // ensure: サーバーにつながらなかったときに呼ぶ関数（サーバーを起動する）。呼んだあと一度だけやり直す
+  constructor(baseUrl, { ensure = null } = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.ensure = ensure;
   }
 
   async request(method, path, body) {
-    const res = await fetch(this.baseUrl + path, {
+    const init = {
       method,
       headers: body ? { "content-type": "application/json" } : {},
       body: body ? JSON.stringify(body) : undefined,
-    });
+    };
+    let res;
+    try {
+      res = await fetch(this.baseUrl + path, init);
+    } catch (err) {
+      if (!this.ensure) throw new Error(`scribe-loop のサーバーに届きません: ${this.baseUrl}（${err.cause?.code || err.message}）`);
+      await this.ensure();
+      res = await fetch(this.baseUrl + path, init);
+    }
     const type = res.headers.get("content-type") || "";
     const data = type.includes("json") ? await res.json() : Buffer.from(await res.arrayBuffer());
     if (!res.ok) throw new Error(`${method} ${path}: ${res.status} ${(data && data.error) || ""}`.trim());

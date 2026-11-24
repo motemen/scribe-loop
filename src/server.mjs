@@ -7,8 +7,22 @@ import fs from "node:fs";
 import path from "node:path";
 import { Store, isId } from "./store.mjs";
 import { wrapDocument, FRAME_CSP } from "./frame.mjs";
-import { renderPages, inkSvg, strokesHeight } from "./render.mjs";
+import { renderPages, inkSvg, strokesHeight, closeRenderer } from "./render.mjs";
+import os from "node:os";
 import { config } from "./config.mjs";
+
+const VERSION = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version || "0.0.0";
+const STARTED_AT = new Date().toISOString();
+
+// 同じマシンからのリクエストか（サーバーを止める API は、同じマシンからだけ受け付ける）
+function isLocal(req) {
+  const addr = (req.socket.remoteAddress || "").replace(/^::ffff:/, "");
+  if (addr === "127.0.0.1" || addr === "::1") return true;
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const i of list || []) if (i.address === addr) return true;
+  }
+  return false;
+}
 
 const PUBLIC_DIR = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "public");
 
@@ -65,7 +79,7 @@ function serveStatic(req, res, rel) {
   });
 }
 
-export function createHandler(store, { publicUrl } = {}) {
+export function createHandler(store, { publicUrl, cfg = {}, onShutdown = () => {} } = {}) {
   // 新しいフィードバックを待っているリクエスト（ロングポーリング）
   const waiters = new Set();
   function notifyWaiters() {
@@ -116,6 +130,23 @@ export function createHandler(store, { publicUrl } = {}) {
     const [, resource, id, sub, subId] = parts;
 
     if (resource === "health") return send(res, 200, { ok: true });
+    if (resource === "status" && method === "GET") {
+      return send(res, 200, {
+        app: "scribe-loop",
+        version: VERSION,
+        pid: process.pid,
+        startedAt: STARTED_AT,
+        dataDir: cfg.dataDir,
+        http: cfg.port ? `http://${cfg.host}:${cfg.port}/` : null,
+        https: cfg.tlsCert && cfg.tlsKey ? `https://${cfg.host}:${cfg.tlsPort}/` : null,
+      });
+    }
+    if (resource === "shutdown" && method === "POST") {
+      if (!isLocal(req)) throw httpError(403, "shutdown is only allowed from the same machine");
+      send(res, 200, { ok: true, pid: process.pid });
+      setTimeout(onShutdown, 50);
+      return;
+    }
 
     if (resource === "documents") {
       if (!id) {
@@ -239,16 +270,33 @@ export function createHandler(store, { publicUrl } = {}) {
 }
 
 export function startServer(cfg = config()) {
+  if (cfg.chrome && !process.env.SCRIBE_LOOP_CHROME) process.env.SCRIBE_LOOP_CHROME = cfg.chrome;
   const store = new Store(cfg.dataDir);
-  const handler = createHandler(store, { publicUrl: cfg.publicUrl });
-  http.createServer(handler).listen(cfg.port, cfg.host, () => {
-    console.log(`scribe-loop: http://${cfg.host}:${cfg.port}/ (data: ${cfg.dataDir})`);
-  });
+  const servers = [];
+  const shutdown = () => {
+    console.log("scribe-loop: shutting down");
+    for (const s of servers) s.close();
+    closeRenderer().finally(() => process.exit(0));
+    setTimeout(() => process.exit(0), 3000).unref();
+  };
+  const handler = createHandler(store, { publicUrl: cfg.publicUrl, cfg, onShutdown: shutdown });
+  const listen = (server, port, label) => {
+    server.on("error", (err) => {
+      // ポートが使われているなど。裏で起動したときは、呼んだ側がログを見て知らせる
+      console.error(`scribe-loop: cannot listen on ${label}: ${err.message}`);
+      process.exit(1);
+    });
+    server.listen(port, cfg.host, () => console.log(`scribe-loop: ${label} (pid ${process.pid}, data: ${cfg.dataDir})`));
+    servers.push(server);
+  };
+  listen(http.createServer(handler), cfg.port, `http://${cfg.host}:${cfg.port}/`);
   if (cfg.tlsCert && cfg.tlsKey) {
-    https
-      .createServer({ cert: fs.readFileSync(cfg.tlsCert), key: fs.readFileSync(cfg.tlsKey) }, handler)
-      .listen(cfg.tlsPort, cfg.host, () => {
-        console.log(`scribe-loop: https://${cfg.host}:${cfg.tlsPort}/`);
-      });
+    listen(
+      https.createServer({ cert: fs.readFileSync(cfg.tlsCert), key: fs.readFileSync(cfg.tlsKey) }, handler),
+      cfg.tlsPort,
+      `https://${cfg.host}:${cfg.tlsPort}/`,
+    );
   }
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }

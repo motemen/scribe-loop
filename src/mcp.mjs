@@ -171,8 +171,11 @@ async function watchFeedback(client, notify) {
   }
 }
 
-export function runMcp(serverUrl, { channel = true } = {}) {
-  const client = new Client(serverUrl);
+export function runMcp(cfg, { channel = true, ensure = null } = {}) {
+  // ツールの呼び出しでは、サーバーが止まっていれば起動する。
+  // 待ち受け（watchFeedback）では起動しない（scribe-loop stop で止めたサーバーを勝手に起こさないため）
+  const client = new Client(cfg.serverUrl, { ensure });
+  const watchClient = new Client(cfg.serverUrl);
   const rl = readline.createInterface({ input: process.stdin });
   const write = (msg) => process.stdout.write(JSON.stringify(msg) + "\n");
   let watching = false;
@@ -195,7 +198,7 @@ export function runMcp(serverUrl, { channel = true } = {}) {
       // 通知には返事をしない。初期化が済んだら、フィードバックを待ち始める
       if (method === "notifications/initialized" && channel && !watching) {
         watching = true;
-        watchFeedback(client, notify);
+        watchFeedback(watchClient, notify);
       }
       return;
     }

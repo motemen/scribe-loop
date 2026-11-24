@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 // scribe-loop のコマンド。
 //
-//   scribe-loop serve                        サーバーを起動する
+//   scribe-loop start                        サーバーを裏で起動する（立っていなければ）
+//   scribe-loop status                       サーバーの状態
+//   scribe-loop stop                         サーバーを止める
+//   scribe-loop restart                      サーバーを起動し直す
+//   scribe-loop serve                        サーバーを手前で動かす（デバッグや systemd 用）
 //   scribe-loop mcp                          MCP サーバー（stdio）を起動する
 //   scribe-loop push <file.html> [--title T] [--reply-to <feedback-id>]
 //   scribe-loop revise <document-id> <file.html> [--feedback <feedback-id>]
@@ -10,13 +14,16 @@
 //   scribe-loop show <feedback-id> [--out <dir>]
 //   scribe-loop done <feedback-id> [--note N]
 //
-// CLI と MCP は SCRIBE_LOOP_URL（既定 http://127.0.0.1:8470）のサーバーを呼ぶ。
+// サーバーを使うコマンドは、サーバーが立っていなければ裏で起動する（serve 以外は起動を気にしなくてよい）。
+// 設定は ~/.config/scribe-loop/env（KEY=VALUE）と環境変数から読む。
+// SCRIBE_LOOP_URL で別のマシンのサーバーを指したときは、起動はしない。
 
 import fs from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { config } from "../src/config.mjs";
 import { Client, describeFeedback } from "../src/client.mjs";
+import { ensureServer, stopServer, probe, logFile } from "../src/daemon.mjs";
 
 const [command, ...rest] = process.argv.slice(2);
 const cfg = config();
@@ -27,9 +34,49 @@ function usage() {
   process.exit(2);
 }
 
+// サーバーにつながらなかったときだけ、起動してからやり直す
+async function ensure() {
+  const { status, started } = await ensureServer(cfg);
+  if (started) console.error(`scribe-loop: サーバーを起動しました ${status.http || cfg.serverUrl}（pid ${status.pid}）`);
+}
+
+function printStatus(status) {
+  console.log(`running\tpid ${status.pid}\tversion ${status.version}\tsince ${status.startedAt}`);
+  if (status.http) console.log(`http\t${status.http}`);
+  if (status.https) console.log(`https\t${status.https}`);
+  console.log(`data\t${status.dataDir}`);
+  console.log(`log\t${logFile(cfg)}`);
+}
+
 async function main() {
-  const client = new Client(cfg.serverUrl);
+  const client = new Client(cfg.serverUrl, { ensure: cfg.autostart ? ensure : null });
   switch (command) {
+    case "start": {
+      await ensure();
+      printStatus(await probe(cfg.serverUrl));
+      return;
+    }
+    case "status": {
+      const status = await probe(cfg.serverUrl);
+      if (!status) {
+        console.log(`stopped\t${cfg.serverUrl}`);
+        process.exitCode = 1;
+        return;
+      }
+      printStatus(status);
+      return;
+    }
+    case "stop": {
+      const status = await stopServer(cfg);
+      console.error(status ? `scribe-loop: サーバー（pid ${status.pid}）を止めました` : "scribe-loop: サーバーは動いていません");
+      return;
+    }
+    case "restart": {
+      await stopServer(cfg);
+      await ensure();
+      printStatus(await probe(cfg.serverUrl));
+      return;
+    }
     case "serve": {
       const { startServer } = await import("../src/server.mjs");
       startServer(cfg);
@@ -37,7 +84,9 @@ async function main() {
     }
     case "mcp": {
       const { runMcp } = await import("../src/mcp.mjs");
-      runMcp(cfg.serverUrl, { channel: process.env.SCRIBE_LOOP_CHANNEL !== "0" });
+      // MCP は起動したらサーバーも用意しておく（Kindle からすぐ開けるように）
+      if (cfg.autostart) await ensureServer(cfg).catch((err) => console.error(`scribe-loop: ${err.message}`));
+      runMcp(cfg, { channel: process.env.SCRIBE_LOOP_CHANNEL !== "0", ensure: cfg.autostart ? () => ensureServer(cfg) : null });
       return;
     }
     case "push": {

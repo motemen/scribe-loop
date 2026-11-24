@@ -33,14 +33,32 @@ Kindle Scribe の画面:
 
 Node.js 20 以上。サーバー自体は依存なしで動きます。認証はないので、LAN の中だけで使ってください。
 
+サーバーを別に起動しておく必要はありません。`scribe-loop` のコマンド（`push` や `mcp` など）は、サーバーが立っていなければ裏で起動します（[k1LoW/mo](https://github.com/k1LoW/mo) と同じ方式です）。
+
 ```sh
-npm install                # 任意: 合成画像を作るための playwright-core
-SCRIBE_LOOP_HOST=<サーバーの LAN 側の IP> node bin/scribe-loop.mjs serve
+npm install                 # 任意: 合成画像を作るための playwright-core
+npm link                    # scribe-loop コマンドを使えるようにする（任意）
+
+scribe-loop start           # 裏で起動する（ほかのコマンドでも自動で起動する）
+scribe-loop status          # 状態、URL、データとログの場所
+scribe-loop stop
+scribe-loop restart         # 更新したあとなど
+scribe-loop serve           # 手前で動かす（デバッグや systemd 用）
 ```
 
-Kindle Scribe のブラウザで `http://<サーバーの LAN 側の IP>:8470/` を開き、ブックマークします。
+Kindle Scribe のブラウザで `http://<サーバーの LAN 側の IP>:8470/` を開き、ブックマークします。サーバーはマシンを再起動すると止まるので、そのあとは何かコマンドを一度実行するか、Claude Code のセッションを開くと立ち上がります（MCP サーバーが起動するときにサーバーも起動します）。
 
-| 環境変数 | 既定 | 内容 |
+### 設定
+
+設定は `~/.config/scribe-loop/env`（`SCRIBE_LOOP_CONFIG` で変えられる）に `KEY=VALUE` の形で書きます。環境変数のほうが優先します。裏で起動するサーバーも同じ設定を読むので、MCP の登録で環境変数を渡す必要はありません。
+
+```sh
+# ~/.config/scribe-loop/env の例
+SCRIBE_LOOP_HOST=192.0.2.10
+SCRIBE_LOOP_PUBLIC_URL=http://192.0.2.10:8470
+```
+
+| 設定 | 既定 | 内容 |
 | --- | --- | --- |
 | `SCRIBE_LOOP_HOST` | `127.0.0.1` | 待ち受ける IP。端末から使うには LAN 側の IP（または `0.0.0.0`）にする |
 | `SCRIBE_LOOP_PORT` | `8470` | HTTP のポート |
@@ -49,39 +67,28 @@ Kindle Scribe のブラウザで `http://<サーバーの LAN 側の IP>:8470/` 
 | `SCRIBE_LOOP_DATA_DIR` | `$XDG_DATA_HOME/scribe-loop` | 資料・書き込み・フィードバックの置き場所 |
 | `SCRIBE_LOOP_PUBLIC_URL` | （なし） | エージェントに資料の URL を返すときの、Kindle から見たサーバーの URL |
 | `SCRIBE_LOOP_CHROME` | よくある場所を探す | 合成画像を作るときに使う Chrome / Chromium |
+| `SCRIBE_LOOP_URL` | 上の設定から決まる | CLI と MCP が呼ぶサーバー。別のマシンのサーバーを指すと、自動では起動しない |
+
+ログは `$XDG_STATE_HOME/scribe-loop/server.log` に書きます。
 
 資料と手書きを重ねた画像は、`playwright-core`（`npm install` で入る任意の依存）と Chrome / Chromium があるときだけ作ります。ないときは、手書きの線だけの SVG と、線の下にある文字をエージェントに渡します。
 
 HTTPS は必須ではありません（初代 Scribe では、HTTPS にしても描画は速くなりませんでした）。使う場合は、自己署名の証明書をサーバーに渡すか、Caddy などのリバースプロキシで TLS を終端して HTTP のポートに転送します。
 
-### 常駐させる（systemd の user unit の例）
+### 常に動かしておきたいとき
 
-```ini
-# ~/.config/systemd/user/scribe-loop.service
-[Unit]
-Description=scribe-loop
-After=network-online.target
-
-[Service]
-EnvironmentFile=%h/.config/scribe-loop/env
-ExecStart=/path/to/node /path/to/scribe-loop/bin/scribe-loop.mjs serve
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=default.target
-```
+マシンの起動と同時にサーバーを立てたいなら、`scribe-loop serve` を systemd などに登録します。コマンドは、すでに立っているサーバーをそのまま使います。
 
 ## エージェントから使う
 
-MCP サーバー（stdio）と CLI があります。どちらも `SCRIBE_LOOP_URL`（既定 `http://127.0.0.1:8470`）のサーバーを呼びます。
+MCP サーバー（stdio）と CLI があります。どちらも設定ファイルのサーバーを呼び、立っていなければ起動します。
 
 ### MCP
 
 Claude Code の場合:
 
 ```sh
-claude mcp add scribe-loop -e SCRIBE_LOOP_URL=http://<サーバー>:8470 -- node /path/to/scribe-loop/bin/scribe-loop.mjs mcp
+claude mcp add -s user scribe-loop -- node /path/to/scribe-loop/bin/scribe-loop.mjs mcp
 ```
 
 | ツール | 内容 |
