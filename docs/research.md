@@ -70,7 +70,9 @@
 - 初代 Kindle Scribe（ファームウェア最新、2026年11月）の標準ブラウザの UA は `Silk/80.4.14 like Chrome/80.0.3987.119`（Android 9）。
 - PointerEvent と `getCoalescedEvents` は使える。Service Worker は使えない。
 - **ペンも `pointerType: "touch"` で届く**（`Touch.force` は null、`radiusX` は 25 で一定）。Hermes Notebook がペンと手をボタンで切り替えているのは、このためと考えられる。
-- ペンの `pressure` は常に 0.5、`width`/`height` は 50、`buttons` は 1。筆圧は取れない。
+- ペン・指・手のひらは、どれも `pointerType: "touch"`、`pressure` 0.5、`width`/`height` 50、`buttons` 1、傾き 0 で届き、区別できない。筆圧も取れない。
+- 手のひらを置いても、同時に届く接触は 1 つだけ（`touches.length` は常に 1）。手のひらを置いたままペンで書くと `pointercancel` が来る。ペンを浮かせたとき（ホバー）のイベントは来ない。
+- 1 回の `pointermove` にまとまる点の数は、ペンで 30〜45、指で 10〜15、手のひらで 4〜5 と違う。ペンのほうがサンプリングが細かいためと思われるが、重なりもあるので判別には使っていない。
 - `getCoalescedEvents` で 1 秒あたり約 285 点を取りこぼしなく取れる。ただしイベントは 1 回に 13〜15 点ずつ、約 50ms おきにしか届かないので、描画の更新は 1 秒に約 20 回になる。体感は「遅いけどなめらか」。
 - `pointerrawupdate` はない。自己署名の証明書の HTTPS でも `isSecureContext` は true になるが、`window.onpointerrawupdate` はなく、イベントも届かない。
 - HTTPS では Service Worker が使える（HTTP では使えない）。
