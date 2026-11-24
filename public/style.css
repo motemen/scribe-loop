@@ -1,0 +1,56 @@
+/* 電子ペーパー向け: 白黒のみ。アニメーション、影、半透明は使わない */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+body {
+  font-family: sans-serif;
+  font-size: 19px;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+}
+a { color: #000; }
+button {
+  font: inherit;
+  font-size: 17px;
+  color: #000;
+  background: #fff;
+  border: 2px solid #000;
+  border-radius: 6px;
+  padding: 6px 12px;
+  min-height: 48px;
+  min-width: 48px;
+  margin: 0 4px 4px 0;
+}
+button.active { background: #000; color: #fff; }
+button[disabled] { border-style: dashed; color: #777; }
+
+/* 一覧 */
+.library { padding: 20px 28px 64px; }
+.library h1 { font-size: 26px; margin: 0 0 4px; }
+.library .sub { font-size: 15px; margin: 0 0 16px; }
+.docs { list-style: none; padding: 0; margin: 0; }
+.docs li { border-top: 1px solid #000; padding: 14px 0; }
+.docs li.reply { padding-left: 32px; }
+.docs a.title { font-size: 22px; text-decoration: none; display: block; }
+.docs .meta { font-size: 15px; }
+.badge { display: inline-block; border: 1px solid #000; border-radius: 4px; padding: 0 6px; margin-right: 6px; font-size: 14px; }
+.badge.strong { background: #000; color: #fff; }
+.empty { font-size: 17px; }
+
+/* 書き込みの画面 */
+#toolbar { padding: 6px 8px 2px; border-bottom: 2px solid #000; }
+#title { font-size: 15px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#status { font-size: 15px; display: inline-block; vertical-align: middle; margin-left: 4px; }
+#viewport { position: relative; overflow: hidden; }
+#surface { position: relative; }
+#doc { position: absolute; left: 0; top: 0; border: 0; display: block; }
+#blank { position: absolute; left: 0; border-top: 1px dashed #000; font-size: 14px; padding: 4px 8px; }
+#ink {
+  position: absolute;
+  left: 0;
+  top: 0;
+  touch-action: none;
+  -ms-touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}

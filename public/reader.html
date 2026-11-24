@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>scribe-loop</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="toolbar">
+  <span id="title"></span>
+  <button type="button" id="homeBtn">一覧</button>
+  <button type="button" id="penBtn" class="active">ペン</button>
+  <button type="button" id="eraserBtn">消しゴム</button>
+  <button type="button" id="undoBtn">戻す</button>
+  <button type="button" id="prevBtn">前</button>
+  <button type="button" id="nextBtn">次</button>
+  <button type="button" id="sendBtn">送る</button>
+  <button type="button" id="replyBtn" style="display:none">返信を読む</button>
+  <span id="status"></span>
+</div>
+<div id="viewport">
+  <div id="surface">
+    <iframe id="doc" sandbox="allow-same-origin" scrolling="no" title="資料"></iframe>
+    <div id="blank">ここから下は白紙です</div>
+  </div>
+</div>
+<script src="/common.js"></script>
+<script src="/reader.js"></script>
+</body>
+</html>

@@ -3,8 +3,18 @@
   "private": true,
   "type": "module",
   "description": "Kindle Scribe の標準ブラウザで、AI エージェントの資料を読み、手書きで返すための環境",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "prototype": "node prototype/server.mjs"
+    "start": "node bin/scribe-loop.mjs serve",
+    "prototype": "node prototype/server.mjs",
+    "test": "node --test test/"
+  },
+  "bin": {
+    "scribe-loop": "bin/scribe-loop.mjs"
+  },
+  "optionalDependencies": {
+    "playwright-core": "^1.65.1"
   }
 }
