@@ -138,7 +138,7 @@ export function createHandler(store, { publicUrl } = {}) {
         return send(res, 200, { acked });
       }
       if (sub === "feedback" && method === "POST") {
-        const body = await readBody(req, 256 * 1024);
+        const body = await readBody(req, 2 * 1024 * 1024);
         const result = store.createFeedback(id, {
           clientRequestId: typeof body.clientRequestId === "string" ? body.clientRequestId.slice(0, 100) : null,
           strokeIds: Array.isArray(body.strokeIds) ? body.strokeIds.map(String) : [],

@@ -56,6 +56,54 @@ export function strokesHeight(strokes) {
   return h;
 }
 
+// 端末とサーバーではフォントなどが違い、資料の組版が少しずれる。
+// 端末で記録した各ブロック要素の位置（deviceLayout）と、サーバーでの同じ要素の位置（serverRects）を
+// 使って、線をその線が乗っている要素に合わせて平行移動する。
+//   deviceLayout: [[index, left, top, width, height], ...]
+//   serverRects:  { [index]: [left, top, width, height] }
+export function alignStrokes(strokes, deviceLayout, serverRects, deviceContentHeight, serverContentHeight) {
+  if (!Array.isArray(deviceLayout) || !deviceLayout.length) return strokes;
+  const pairs = deviceLayout
+    .filter((d) => serverRects[d[0]])
+    .map((d) => ({ dl: d[1], dt: d[2], dw: d[3], dh: d[4], s: serverRects[d[0]] }));
+  return strokes.map((stroke) => {
+    const pts = stroke.points || [];
+    if (!pts.length) return stroke;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+      minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    let dx = 0;
+    let dy = 0;
+    if (deviceContentHeight && cy > deviceContentHeight) {
+      // 資料の後ろの白紙: 資料の終わりに合わせる
+      if (serverContentHeight) dy = serverContentHeight - deviceContentHeight;
+    } else {
+      // 線の中心を縦に含む要素のうち、横にも含むもの、その中で一番小さいもの
+      const vertical = pairs.filter((p) => cy >= p.dt && cy <= p.dt + p.dh);
+      const both = vertical.filter((p) => cx >= p.dl && cx <= p.dl + p.dw);
+      const pool = both.length ? both : vertical;
+      pool.sort((a, b) => a.dh * (both.length ? a.dw : 1) - b.dh * (both.length ? b.dw : 1));
+      const hit = pool[0];
+      if (hit) {
+        const [sl, st, sw, sh] = hit.s;
+        dy = st + ((cy - hit.dt) * sh) / Math.max(1, hit.dh) - cy;
+        if (both.length) dx = sl + ((cx - hit.dl) * sw) / Math.max(1, hit.dw) - cx;
+      } else {
+        // どの要素にも乗っていない（要素のあいだ）: 直前の要素の下端に合わせる
+        let above = null;
+        for (const p of pairs) if (p.dt + p.dh <= cy && (!above || p.dt + p.dh > above.dt + above.dh)) above = p;
+        if (above) dy = above.s[1] + above.s[3] - (above.dt + above.dh);
+      }
+    }
+    if (!dx && !dy) return stroke;
+    return { ...stroke, points: pts.map((p) => [p[0] + dx, p[1] + dy, ...p.slice(2)]) };
+  });
+}
+
 // ページごとの PNG を outDir に書き、ファイル名の配列を返す。作れなければ null。
 export async function renderPages({ html, strokes, surface, outDir }) {
   const width = Math.round((surface && surface.width) || 930);
@@ -68,6 +116,19 @@ export async function renderPages({ html, strokes, surface, outDir }) {
   try {
     await page.setContent(wrapDocument(html), { waitUntil: "load" });
     const contentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+    const layout = (surface && surface.layout) || [];
+    const serverRects = await page.evaluate((indexes) => {
+      const all = document.body.getElementsByTagName("*");
+      const out = {};
+      for (const i of indexes) {
+        const el = all[i];
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        out[i] = [r.left, r.top + window.scrollY, r.width, r.height];
+      }
+      return out;
+    }, layout.map((d) => d[0]));
+    strokes = alignStrokes(strokes, layout, serverRects, surface && surface.contentHeight, contentHeight);
     const total = Math.max(contentHeight + pageHeight, strokesHeight(strokes) + 40);
     const pages = Math.ceil(total / pageHeight);
     const fullHeight = pages * pageHeight;

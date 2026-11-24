@@ -477,6 +477,28 @@
     }
   }
 
+  // 資料の各ブロック要素の位置。サーバーで合成画像を作るときに、フォントの違いによる
+  // ずれを補正するのに使う。[文書内の要素の番号, left, top, width, height]
+  function captureLayout() {
+    var out = [];
+    try {
+      var doc = frame.contentDocument;
+      var all = doc.body.getElementsByTagName("*");
+      for (var i = 0; i < all.length && out.length < 3000; i += 1) {
+        var el = all[i];
+        if (el.ownerSVGElement) continue; // SVG の中の図形は見ない
+        var tag = el.tagName.toLowerCase();
+        var display = doc.defaultView.getComputedStyle(el).display;
+        if (display === "none") continue;
+        if (display.indexOf("inline") === 0 && tag !== "svg" && tag !== "img") continue;
+        var r = el.getBoundingClientRect();
+        if (r.height <= 0 || r.width <= 0) continue;
+        out.push([i, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]);
+      }
+    } catch (e) {}
+    return out;
+  }
+
   function send() {
     var ids = [];
     for (var i = 0; i < strokes.length; i += 1) ids.push(strokes[i].id);
@@ -484,7 +506,7 @@
       clientRequestId: SL.randomId("fr"),
       client: SL.clientId,
       strokeIds: ids,
-      surface: { width: ink.clientWidth || ink.offsetWidth, pageHeight: pageHeight, contentHeight: contentHeight, devicePixelRatio: window.devicePixelRatio || 1, userAgent: navigator.userAgent }
+      surface: { width: ink.clientWidth || ink.offsetWidth, pageHeight: pageHeight, contentHeight: contentHeight, devicePixelRatio: window.devicePixelRatio || 1, userAgent: navigator.userAgent, layout: captureLayout() }
     };
     sendState = "送信中…";
     saveLocal();
