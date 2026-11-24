@@ -27,6 +27,7 @@
     "playwright-core": "^1.65.1"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }
