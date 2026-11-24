@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>scribe-loop 評価</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+  <h1>評価</h1>
+  <p class="note">1 = とても悪い、5 = とても良い。押した時点で送信されます（あとから押し直してかまいません）。</p>
+  <div id="questions"></div>
+  <p><a href="/">一覧に戻る</a></p>
+</div>
+<script src="common.js"></script>
+<script>
+(function () {
+  var questions = [
+    ["latency-canvas", "書いてから線が出るまでの速さ（Canvas）"],
+    ["latency-svg", "書いてから線が出るまでの速さ（SVG）"],
+    ["smoothness", "線のなめらかさ・取りこぼしのなさ"],
+    ["japanese", "日本語の小さい字の書きやすさ"],
+    ["palm", "手のひらを置いたまま書けるか"],
+    ["eraser", "消しゴムの使いやすさ"],
+    ["annotate", "文章の上への書き込みやすさ"],
+    ["scroll", "スクロールの読みやすさ（残像など）"],
+    ["paged", "ページ送りの読みやすさ（残像など）"],
+    ["resume", "スリープ・通信切断からの復帰"],
+    ["overall", "毎日使いたいと思えるか"]
+  ];
+  var saved = {};
+  try { saved = JSON.parse(SL.storage.get("sl.rating") || "{}") || {}; } catch (e) {}
+  var root = document.getElementById("questions");
+  questions.forEach(function (q) {
+    var box = document.createElement("div");
+    box.className = "rating";
+    var label = document.createElement("div");
+    label.className = "q";
+    label.appendChild(document.createTextNode(q[1]));
+    box.appendChild(label);
+    var buttons = [];
+    for (var v = 1; v <= 5; v += 1) {
+      (function (value) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.appendChild(document.createTextNode(String(value)));
+        if (saved[q[0]] === value) b.className = "active";
+        SL.tap(b, function () {
+          saved[q[0]] = value;
+          SL.storage.set("sl.rating", JSON.stringify(saved));
+          for (var i = 0; i < buttons.length; i += 1) buttons[i].className = i + 1 === value ? "active" : "";
+          SL.log("rating", { q: q[0], v: value });
+          SL.flushLog();
+        });
+        buttons.push(b);
+        box.appendChild(b);
+      })(v);
+    }
+    root.appendChild(box);
+  });
+})();
+</script>
+</body>
+</html>

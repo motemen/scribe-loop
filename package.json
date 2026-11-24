@@ -1,0 +1,10 @@
+{
+  "name": "scribe-loop",
+  "private": true,
+  "type": "module",
+  "description": "Kindle Scribe の標準ブラウザで、AI エージェントの資料を読み、手書きで返すための環境",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "prototype": "node prototype/server.mjs"
+  }
+}

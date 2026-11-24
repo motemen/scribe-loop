@@ -1,0 +1,70 @@
+/* 電子ペーパー向け: 白黒のみ、アニメーションや影、半透明は使わない */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+body {
+  font-family: "Noto Serif JP", "Hiragino Mincho ProN", serif;
+  font-size: 20px;
+  line-height: 1.8;
+  -webkit-text-size-adjust: 100%;
+}
+a { color: #000; }
+button {
+  font: inherit;
+  font-size: 17px;
+  color: #000;
+  background: #fff;
+  border: 2px solid #000;
+  border-radius: 6px;
+  padding: 6px 12px;
+  min-height: 48px;
+  min-width: 48px;
+  margin: 0 4px 4px 0;
+}
+button.active { background: #000; color: #fff; }
+button[disabled] { border-style: dashed; color: #888; }
+
+/* 一覧・評価のページ */
+.page { padding: 24px 32px 64px; max-width: 1100px; }
+.page h1 { font-size: 28px; margin: 0 0 12px; }
+.page h2 { font-size: 22px; margin: 28px 0 8px; border-bottom: 2px solid #000; }
+.menu { padding-left: 1.2em; }
+.menu li { margin: 10px 0; }
+.menu a { font-size: 22px; }
+.note { font-size: 16px; }
+table.kv { border-collapse: collapse; font-size: 15px; line-height: 1.4; }
+table.kv td { border: 1px solid #000; padding: 4px 8px; vertical-align: top; word-break: break-all; }
+.rating { margin: 16px 0; }
+.rating .q { margin-bottom: 4px; }
+
+/* 書き込みの画面 */
+#toolbar {
+  padding: 6px 8px 2px;
+  border-bottom: 2px solid #000;
+  font-family: sans-serif;
+}
+#status { font-size: 15px; display: inline-block; vertical-align: middle; margin-left: 6px; }
+#viewport { position: relative; overflow: hidden; }
+#viewport.scroll { overflow-y: auto; }
+#surface { position: relative; }
+#ink {
+  position: absolute;
+  left: 0;
+  top: 0;
+  touch-action: none;
+  -ms-touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+#text {
+  /* 右に書き込み用の広い余白を取る */
+  padding: 24px 34% 48px 40px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+#text h1 { font-size: 30px; line-height: 1.4; }
+#text h2 { font-size: 24px; margin-top: 40px; }
+#text table { border-collapse: collapse; }
+#text th, #text td { border: 1px solid #000; padding: 4px 10px; }
+#text pre { font-size: 16px; line-height: 1.5; border: 1px solid #000; padding: 10px; white-space: pre-wrap; }
+#text .figure { text-align: center; }
