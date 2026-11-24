@@ -31,8 +31,11 @@
     }
   };
 
+  var idSeq = 0;
   SL.randomId = function (prefix) {
-    return prefix + "-" + SL.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+    idSeq += 1;
+    var rand = Math.floor(Math.random() * 0x7fffffff).toString(36);
+    return prefix + "-" + SL.now().toString(36) + idSeq.toString(36) + "-" + rand;
   };
 
   SL.clientId = SL.storage.get("sl.client");
@@ -77,41 +80,35 @@
     xhr.send();
   };
 
-  // ボタン。ペンで書いた直後は click が来ないことがある（Hermes Notebook の知見）ので、
-  // pointerup / touchend で反応し、そのあとに来る click は重複として捨てる。
+  // ボタン。Kindle Scribe のブラウザ（Silk）は、ペンで書いた直後などに click を出さないことがあるので、
+  // 指（ペン）を離したときに反応する。そのあとに click が来ても、少しのあいだは同じ操作として無視する。
   var loadedAt = SL.now();
   SL.tap = function (element, handler) {
-    var armed = false;
-    var firedAt = 0;
-    function fire(event, how) {
+    var usePointer = !!window.PointerEvent;
+    var pressed = false;
+    var releasedAt = 0;
+    function run(event) {
       // 前のページで押した指の click が、遷移した先のボタンに届くことがあるので、開いた直後は無視する
       if (SL.now() - loadedAt < 1000) return;
-      if (how !== "click") firedAt = SL.now();
       handler(event);
     }
-    if (window.PointerEvent) {
-      SL.on(element, "pointerdown", function () { armed = true; });
-      SL.on(element, "pointercancel", function () { armed = false; });
-      SL.on(element, "pointerup", function (e) {
-        if (!armed) return;
-        armed = false;
-        if (e.pointerType === "mouse") return;
-        fire(e, "pointerup");
-      });
-    } else if ("ontouchstart" in window) {
-      SL.on(element, "touchstart", function () { armed = true; });
-      SL.on(element, "touchend", function (e) {
-        if (!armed) return;
-        armed = false;
-        fire(e, "touchend");
-      });
-    }
+    SL.on(element, usePointer ? "pointerdown" : "touchstart", function (e) {
+      pressed = e.pointerType !== "mouse"; // マウスはふつうの click に任せる
+    });
+    SL.on(element, usePointer ? "pointercancel" : "touchcancel", function () {
+      pressed = false;
+    });
+    SL.on(element, usePointer ? "pointerup" : "touchend", function (e) {
+      if (!pressed) return;
+      pressed = false;
+      releasedAt = SL.now();
+      run(e);
+    });
     SL.on(element, "click", function (e) {
-      if (SL.now() - firedAt < 800) return;
-      fire(e, "click");
+      if (SL.now() - releasedAt < 700) return;
+      run(e);
     });
   };
-
 
   SL.formatTime = function (iso) {
     var d = new Date(iso);

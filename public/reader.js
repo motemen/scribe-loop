@@ -184,34 +184,22 @@
 
   // ---- 書き込みの下にあるもの ----
 
+  // 線の下にある、意味のまとまりになる要素（段落、表のセル、図など）
+  var BLOCK_SELECTOR = "p, li, td, th, h1, h2, h3, h4, h5, h6, pre, blockquote, figure, figcaption, dt, dd, caption, section, article, table, img, svg, div";
+
   function blockOf(el, doc) {
-    var node = el;
-    while (node && node.nodeType === 1 && node !== doc.body && node !== doc.documentElement) {
-      if (/^(P|LI|TD|TH|H[1-6]|PRE|BLOCKQUOTE|FIGURE|FIGCAPTION|DT|DD|CAPTION|SECTION|ARTICLE|TABLE|IMG|SVG|DIV)$/i.test(node.tagName)) return node;
-      node = node.parentNode;
-    }
-    return null;
+    var found = el && el.closest ? el.closest(BLOCK_SELECTOR) : null;
+    return found && found !== doc.body && found !== doc.documentElement ? found : null;
   }
 
+  // 要素を特定する CSS セレクタ。id があればそれを使い、なければ body からの nth-child の道筋にする
   function selectorOf(el, doc) {
-    var parts = [];
-    var node = el;
-    while (node && node.nodeType === 1 && node !== doc.body && parts.length < 6) {
-      if (node.id) {
-        parts.unshift("#" + node.id);
-        break;
-      }
-      var tag = node.tagName.toLowerCase();
-      var index = 1;
-      var sib = node.previousElementSibling;
-      while (sib) {
-        if (sib.tagName === node.tagName) index += 1;
-        sib = sib.previousElementSibling;
-      }
-      parts.unshift(tag + ":nth-of-type(" + index + ")");
-      node = node.parentNode;
-    }
-    return parts.join(" > ");
+    if (el.id) return "#" + el.id;
+    var parent = el.parentElement;
+    if (!parent || el === doc.body) return "body";
+    var position = Array.prototype.indexOf.call(parent.children, el) + 1;
+    var step = el.tagName.toLowerCase() + ":nth-child(" + position + ")";
+    return (parent === doc.body ? "body" : selectorOf(parent, doc)) + " > " + step;
   }
 
   function clean(text, max) {
