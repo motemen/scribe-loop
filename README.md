@@ -5,7 +5,7 @@ AI エージェントが作った資料を Kindle Scribe の標準ブラウザ�
 ```
 エージェント ──(MCP / CLI で HTML を登録)──▶ サーバー ◀──(ブラウザ)── Kindle Scribe
      ▲                                          │            読む・書き込む・「送る」
-     └──(「読んで」と頼まれたら取りに行く)────────┘
+     └──(「読んで」と頼まれたら、または通知で取りに行く)──┘
 ```
 
 - 要件: [docs/requirements.md](docs/requirements.md)
@@ -17,8 +17,8 @@ AI エージェントが作った資料を Kindle Scribe の標準ブラウザ�
 1. エージェントが資料（HTML）を登録する。
 2. Kindle Scribe のブラウザで一覧を開き、資料を読んで、ペンで書き込む。書き込みは自動で保存される。
 3. 書き終えたら「送る」を押す。
-4. エージェントのセッションで「Scribe のフィードバックを読んで」と頼む。エージェントは元の資料・手書きの位置とその下の文字・資料と手書きを重ねた画像を受け取り、回答や改訂版を返信として登録する。
-5. Kindle の一覧に返信が出る。
+4. エージェントのセッションに戻り、「Scribe のフィードバックを読んで」と頼む（channels を使えば自動で届く）。エージェントは元の資料・手書きの位置とその下の文字・資料と手書きを重ねた画像を受け取り、セッションの会話で応答する。
+5. 必要なら「改訂版を Scribe に送って」などと頼む。返信の資料は Kindle の一覧で元の資料の下に出る。
 
 Kindle Scribe の画面:
 
@@ -92,7 +92,7 @@ claude mcp add scribe-loop -e SCRIBE_LOOP_URL=http://<サーバー>:8470 -- node
 
 ### 「送る」を Claude Code に通知する（channels）
 
-MCP サーバーは Claude Code の [channels](https://code.claude.com/docs/en/channels.md)（研究プレビュー）に対応しています。channels を有効にして起動したセッションでは、Kindle で「送る」を押すとイベントが届き、エージェントがそのままフィードバックを読んで返信します。
+MCP サーバーは Claude Code の [channels](https://code.claude.com/docs/en/channels.md)（研究プレビュー）に対応しています。channels を有効にして起動したセッションでは、Kindle で「送る」を押すとイベントが届き、エージェントがフィードバックを読んで、セッションの会話で応答します（Kindle に資料を返すのは、頼んだときだけです）。
 
 ```sh
 claude --dangerously-load-development-channels server:scribe-loop

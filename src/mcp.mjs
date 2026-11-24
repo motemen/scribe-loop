@@ -10,7 +10,7 @@ const TOOLS = [
   {
     name: "scribe_push_document",
     description:
-      "Kindle Scribe で読む資料（HTML）を登録する。フィードバックへの回答や改訂版なら in_reply_to にそのフィードバックの ID を渡す（そのフィードバックは処理済みになる）。\n\n" +
+      "Kindle Scribe で読む資料（HTML）を登録する。人に頼まれてフィードバックへの回答や改訂版を Kindle に返すときは、in_reply_to にそのフィードバックの ID を渡す（そのフィードバックは処理済みになる）。\n\n" +
       AGENT_GUIDE,
     inputSchema: {
       type: "object",
@@ -42,7 +42,7 @@ const TOOLS = [
   },
   {
     name: "scribe_update_feedback",
-    description: "フィードバックの状態を変える。返信の資料を登録せずに処理済みにするときなどに使う。",
+    description: "フィードバックの状態を変える。会話だけで対応し終えたら done にする。",
     inputSchema: {
       type: "object",
       properties: {
@@ -115,7 +115,7 @@ async function callTool(client, name, args) {
 const CHANNEL_INSTRUCTIONS = `
 
 Claude Code を channels つきで起動している場合（claude --dangerously-load-development-channels server:scribe-loop など）、人が Kindle Scribe で「送る」を押すと <channel source="scribe-loop" feedback_id="..."> のイベントが届く。
-イベントが届いたら、scribe_get_feedback でそのフィードバックを読み、回答や改訂版を作って scribe_push_document（in_reply_to にそのフィードバックの ID）で登録する。セッションで別の作業をしている途中なら、区切りのよいところで対応する。`;
+イベントが届いたら、scribe_get_feedback でそのフィードバックを読み、書き込みの内容をセッションの会話で受け止めて応答する（Kindle への資料の返信は、人が頼んだときだけ）。セッションで別の作業をしている途中なら、区切りのよいところで対応する。`;
 
 // 新しいフィードバックを待ち、届いたら Claude Code のセッションに channel のイベントとして送る
 async function watchFeedback(client, notify) {
@@ -137,7 +137,7 @@ async function watchFeedback(client, notify) {
       const { feedback } = await client.waitFeedback(after, 60);
       for (const f of feedback) {
         notify(
-          `Kindle Scribe で「${f.documentTitle}」への書き込みが送られました（フィードバック ${f.id}、線 ${f.newStrokes} 本）。scribe_get_feedback で読んで、返信を登録してください。`,
+          `Kindle Scribe で「${f.documentTitle}」への書き込みが送られました（フィードバック ${f.id}、線 ${f.newStrokes} 本）。scribe_get_feedback で読んでください。`,
           { kind: "feedback", feedback_id: f.id, document_id: f.documentId },
         );
         if (f.createdAt > after) after = f.createdAt;
