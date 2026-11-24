@@ -90,6 +90,18 @@ claude mcp add scribe-loop -e SCRIBE_LOOP_URL=http://<サーバー>:8470 -- node
 | `scribe_update_feedback` | フィードバックの状態を変える |
 | `scribe_list_documents` | 資料の一覧 |
 
+### 「送る」を Claude Code に通知する（channels）
+
+MCP サーバーは Claude Code の [channels](https://code.claude.com/docs/en/channels.md)（研究プレビュー）に対応しています。channels を有効にして起動したセッションでは、Kindle で「送る」を押すとイベントが届き、エージェントがそのままフィードバックを読んで返信します。
+
+```sh
+claude --dangerously-load-development-channels server:scribe-loop
+```
+
+- 起動時に確認の画面が出るので、ローカルでの開発用であることを選びます（独自の channel は、プレビューのあいだ許可リストに載っていないため）。
+- イベントが届くのは、そのセッションが開いているあいだだけです。作業中に届いたものは、区切りのよいところでまとめて処理されます。
+- 通知を止めるには、MCP サーバーの環境変数に `SCRIBE_LOOP_CHANNEL=0` を設定します。
+
 ### CLI
 
 ```sh

@@ -29,6 +29,10 @@ export class Client {
     return this.request("GET", `/api/feedback${status ? `?status=${encodeURIComponent(status)}` : ""}`).then((d) => d.feedback);
   }
 
+  waitFeedback(after, timeout = 30) {
+    return this.request("GET", `/api/feedback/wait?after=${encodeURIComponent(after)}&timeout=${timeout}`);
+  }
+
   getFeedback(id) {
     return this.request("GET", `/api/feedback/${encodeURIComponent(id)}`);
   }

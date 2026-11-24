@@ -66,6 +66,13 @@ function serveStatic(req, res, rel) {
 }
 
 export function createHandler(store, { publicUrl } = {}) {
+  // 新しいフィードバックを待っているリクエスト（ロングポーリング）
+  const waiters = new Set();
+  function notifyWaiters() {
+    for (const w of waiters) w();
+    waiters.clear();
+  }
+
   function documentUrl(id) {
     return publicUrl ? `${publicUrl.replace(/\/$/, "")}/d/${id}` : `/d/${id}`;
   }
@@ -147,11 +154,39 @@ export function createHandler(store, { publicUrl } = {}) {
         });
         if (result.missing) return send(res, 409, { error: "strokes not received yet", missing: result.missing });
         const fb = result.feedback;
+        notifyWaiters();
         return send(res, 201, { id: fb.id, status: fb.status, createdAt: fb.createdAt });
       }
     }
 
     if (resource === "feedback") {
+      // after（ISO 時刻）より新しいフィードバックが届くまで、最大 timeout 秒待つ
+      if (id === "wait" && method === "GET") {
+        const after = url.searchParams.get("after") || "";
+        const timeout = Math.min(120, Math.max(1, Number(url.searchParams.get("timeout")) || 30));
+        const fresh = () => store.listFeedback().filter((f) => f.createdAt > after);
+        let list = fresh();
+        if (!list.length) {
+          await new Promise((resolve) => {
+            const timer = setTimeout(() => {
+              waiters.delete(done);
+              resolve();
+            }, timeout * 1000);
+            const done = () => {
+              clearTimeout(timer);
+              resolve();
+            };
+            waiters.add(done);
+            req.on("close", () => {
+              waiters.delete(done);
+              clearTimeout(timer);
+              resolve();
+            });
+          });
+          list = fresh();
+        }
+        return send(res, 200, { feedback: list, now: new Date().toISOString() });
+      }
       if (!id && method === "GET") {
         const status = url.searchParams.get("status") || undefined;
         return send(res, 200, { feedback: store.listFeedback({ status }) });

@@ -36,7 +36,7 @@ async function main() {
     }
     case "mcp": {
       const { runMcp } = await import("../src/mcp.mjs");
-      runMcp(cfg.serverUrl);
+      runMcp(cfg.serverUrl, { channel: process.env.SCRIBE_LOOP_CHANNEL !== "0" });
       return;
     }
     case "push": {

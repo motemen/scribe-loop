@@ -112,10 +112,51 @@ async function callTool(client, name, args) {
   }
 }
 
-export function runMcp(serverUrl) {
+const CHANNEL_INSTRUCTIONS = `
+
+Claude Code を channels つきで起動している場合（claude --dangerously-load-development-channels server:scribe-loop など）、人が Kindle Scribe で「送る」を押すと <channel source="scribe-loop" feedback_id="..."> のイベントが届く。
+イベントが届いたら、scribe_get_feedback でそのフィードバックを読み、回答や改訂版を作って scribe_push_document（in_reply_to にそのフィードバックの ID）で登録する。セッションで別の作業をしている途中なら、区切りのよいところで対応する。`;
+
+// 新しいフィードバックを待ち、届いたら Claude Code のセッションに channel のイベントとして送る
+async function watchFeedback(client, notify) {
+  let after = new Date().toISOString();
+  try {
+    const pending = await client.listFeedback("pending");
+    if (pending.length) {
+      notify(
+        `Kindle Scribe から未処理のフィードバックが ${pending.length} 件あります:\n` +
+          pending.map((f) => `- ${f.id}「${f.documentTitle}」（線 ${f.newStrokes} 本）`).join("\n"),
+        { kind: "pending", count: String(pending.length) },
+      );
+    }
+  } catch {
+    // サーバーが動いていなければ、下のループで待つ
+  }
+  for (;;) {
+    try {
+      const { feedback } = await client.waitFeedback(after, 60);
+      for (const f of feedback) {
+        notify(
+          `Kindle Scribe で「${f.documentTitle}」への書き込みが送られました（フィードバック ${f.id}、線 ${f.newStrokes} 本）。scribe_get_feedback で読んで、返信を登録してください。`,
+          { kind: "feedback", feedback_id: f.id, document_id: f.documentId },
+        );
+        if (f.createdAt > after) after = f.createdAt;
+      }
+    } catch {
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  }
+}
+
+export function runMcp(serverUrl, { channel = true } = {}) {
   const client = new Client(serverUrl);
   const rl = readline.createInterface({ input: process.stdin });
   const write = (msg) => process.stdout.write(JSON.stringify(msg) + "\n");
+  let watching = false;
+  const notify = (content, meta) => write({ jsonrpc: "2.0", method: "notifications/claude/channel", params: { content, meta } });
+
+  // クライアントが標準入力を閉じたら終わる（フィードバックの待ち受けが残らないように）
+  rl.on("close", () => process.exit(0));
 
   rl.on("line", async (line) => {
     if (!line.trim()) return;
@@ -127,16 +168,23 @@ export function runMcp(serverUrl) {
       return;
     }
     const { id, method, params } = msg;
-    if (id === undefined) return; // 通知には返事をしない
+    if (id === undefined) {
+      // 通知には返事をしない。初期化が済んだら、フィードバックを待ち始める
+      if (method === "notifications/initialized" && channel && !watching) {
+        watching = true;
+        watchFeedback(client, notify);
+      }
+      return;
+    }
     try {
       let result;
       if (method === "initialize") {
         const requested = params && params.protocolVersion;
         result = {
           protocolVersion: PROTOCOL_VERSIONS.includes(requested) ? requested : PROTOCOL_VERSIONS[0],
-          capabilities: { tools: {} },
+          capabilities: channel ? { tools: {}, experimental: { "claude/channel": {} } } : { tools: {} },
           serverInfo: { name: "scribe-loop", version: "0.1.0" },
-          instructions: AGENT_GUIDE,
+          instructions: AGENT_GUIDE + (channel ? CHANNEL_INSTRUCTIONS : ""),
         };
       } else if (method === "ping") {
         result = {};
