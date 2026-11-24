@@ -16,7 +16,7 @@
 
 | 部分 | 内容 |
 | --- | --- |
-| サーバー（`src/server.mjs`） | 依存なしの Node.js。資料・書き込み・フィードバックをファイルに保存する。HTTP と、証明書を渡せば HTTPS でも待ち受ける。認証なし、LAN 専用 |
+| サーバー（`src/server.mjs`） | 依存なしの Node.js。資料・書き込み・フィードバックをファイルに保存する。HTTP のみ。認証なし、LAN 専用。CLI や MCP から必要になったときに裏で起動する |
 | Kindle 向けのページ（`public/`） | 一覧と、閲覧兼書き込みの画面。ES5 で書く |
 | CLI と MCP サーバー（`bin/scribe-loop.mjs`） | サーバーの HTTP API を呼ぶ。MCP は stdio |
 | 合成画像（`src/render.mjs`） | 資料と手書きを重ねた PNG を作る。任意。`playwright-core` と Chrome があるときだけ |

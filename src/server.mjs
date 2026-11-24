@@ -2,7 +2,6 @@
 // 認証はない。LAN の中だけで使うこと。
 
 import http from "node:http";
-import https from "node:https";
 import fs from "node:fs";
 import path from "node:path";
 import { Store, isId } from "./store.mjs";
@@ -137,8 +136,9 @@ export function createHandler(store, { publicUrl, cfg = {}, onShutdown = () => {
         pid: process.pid,
         startedAt: STARTED_AT,
         dataDir: cfg.dataDir,
-        http: cfg.port ? `http://${cfg.host}:${cfg.port}/` : null,
-        https: cfg.tlsCert && cfg.tlsKey ? `https://${cfg.host}:${cfg.tlsPort}/` : null,
+        host: cfg.host,
+        port: cfg.port,
+        publicUrl: cfg.publicUrl || null,
       });
     }
     if (resource === "shutdown" && method === "POST") {
@@ -250,7 +250,7 @@ export function createHandler(store, { publicUrl, cfg = {}, onShutdown = () => {
       }
       if (sub === "pages" && method === "GET") {
         const outDir = store.feedbackDir(fb.id);
-        const pages = await renderPages({ html: store.source(fb.documentId, fb.revision), strokes: fb.strokes, surface: fb.surface, outDir });
+        const pages = await renderPages({ html: store.source(fb.documentId, fb.revision), strokes: fb.strokes, surface: fb.surface, outDir, chrome: cfg.chrome });
         if (!subId) return send(res, 200, { available: !!pages, pages: pages || [] });
         const entry = (pages || []).find((p) => p.file === subId);
         if (!entry) throw httpError(404, "page not found");
@@ -270,7 +270,6 @@ export function createHandler(store, { publicUrl, cfg = {}, onShutdown = () => {
 }
 
 export function startServer(cfg = config()) {
-  if (cfg.chrome && !process.env.SCRIBE_LOOP_CHROME) process.env.SCRIBE_LOOP_CHROME = cfg.chrome;
   const store = new Store(cfg.dataDir);
   const servers = [];
   const shutdown = () => {
@@ -280,6 +279,7 @@ export function startServer(cfg = config()) {
     setTimeout(() => process.exit(0), 3000).unref();
   };
   const handler = createHandler(store, { publicUrl: cfg.publicUrl, cfg, onShutdown: shutdown });
+  const label = `http://${cfg.host.includes(":") ? `[${cfg.host}]` : cfg.host}:${cfg.port}/`;
   const listen = (server, port, label) => {
     server.on("error", (err) => {
       // ポートが使われているなど。裏で起動したときは、呼んだ側がログを見て知らせる
@@ -289,14 +289,7 @@ export function startServer(cfg = config()) {
     server.listen(port, cfg.host, () => console.log(`scribe-loop: ${label} (pid ${process.pid}, data: ${cfg.dataDir})`));
     servers.push(server);
   };
-  listen(http.createServer(handler), cfg.port, `http://${cfg.host}:${cfg.port}/`);
-  if (cfg.tlsCert && cfg.tlsKey) {
-    listen(
-      https.createServer({ cert: fs.readFileSync(cfg.tlsCert), key: fs.readFileSync(cfg.tlsKey) }, handler),
-      cfg.tlsPort,
-      `https://${cfg.host}:${cfg.tlsPort}/`,
-    );
-  }
+  listen(http.createServer(handler), cfg.port, cfg.publicUrl ? `${label} (Kindle: ${cfg.publicUrl}/)` : label);
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 }

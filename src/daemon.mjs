@@ -48,7 +48,7 @@ function spawnServer(cfg) {
     // ログがまだない
   }
   const fd = fs.openSync(log, "a");
-  const child = spawn(process.execPath, [BIN, "serve"], {
+  const child = spawn(process.execPath, [BIN, "serve", ...(cfg.serveArgs || [])], {
     detached: true, // 別のセッションにして、コマンドが終わっても残す
     stdio: ["ignore", fd, fd],
     env: cfg.env || process.env,

@@ -1,64 +1,63 @@
-import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+// コマンドラインのフラグ（すべてのコマンドで共通）。設定ファイルや環境変数は使わない。
+export const SERVER_OPTIONS = {
+  host: { type: "string" },
+  port: { type: "string" },
+  "data-dir": { type: "string" },
+  "public-url": { type: "string" },
+  chrome: { type: "string" },
+  url: { type: "string" },
+};
+
 function xdg(name, fallback, env) {
-  return env[name] || path.join(os.homedir(), fallback);
+  return env[name] || path.join(env.HOME || os.homedir(), fallback);
 }
 
-export function configPath(env = process.env) {
-  return env.SCRIBE_LOOP_CONFIG || path.join(xdg("XDG_CONFIG_HOME", ".config", env), "scribe-loop", "env");
-}
-
-// KEY=VALUE を 1 行に 1 つ書いた設定ファイル（systemd の EnvironmentFile と同じ形）を読む。
-// 環境変数のほうが優先する。
-export function loadConfigFile(file) {
-  const out = {};
-  let text;
-  try {
-    text = fs.readFileSync(file, "utf8");
-  } catch {
-    return out;
+// 0.0.0.0 で待ち受けるとき、Kindle から見えそうな LAN 側の IPv4 を探す（資料の URL に使う）
+export function guessLanAddress(interfaces = os.networkInterfaces()) {
+  const skip = /^(lo|docker|br-|veth|virbr|tailscale|tun|tap|wg|zt|utun|cni|flannel|cali)/;
+  const candidates = [];
+  for (const [name, list] of Object.entries(interfaces)) {
+    if (skip.test(name)) continue;
+    for (const i of list || []) {
+      if (i.family !== "IPv4" && i.family !== 4) continue;
+      if (i.internal) continue;
+      candidates.push(i.address);
+    }
   }
-  for (const raw of text.split("\n")) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const m = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
-    if (!m) continue;
-    let value = m[2].trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
-    out[m[1]] = value;
-  }
-  return out;
+  const isPrivate = (a) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a);
+  return candidates.find(isPrivate) || candidates[0] || "";
 }
 
-function isSpecificHost(host) {
-  return !["0.0.0.0", "::", "127.0.0.1", "::1", "localhost"].includes(host);
-}
+const bracket = (h) => (h.includes(":") ? `[${h}]` : h);
 
-export function config(env = process.env) {
-  const e = { ...loadConfigFile(configPath(env)), ...env };
-  const host = e.SCRIBE_LOOP_HOST || "127.0.0.1";
-  const port = Number(e.SCRIBE_LOOP_PORT || 8470);
-  // 0.0.0.0 などで待ち受けるときも、同じマシンからは 127.0.0.1 で呼べる
-  const localHost = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
+export function config(opts = {}, env = process.env) {
+  const host = opts.host || "0.0.0.0";
+  const port = Number(opts.port || 8470);
+  const wildcard = host === "0.0.0.0" || host === "::";
+  const local = wildcard ? "127.0.0.1" : host;
+  const lan = wildcard ? guessLanAddress() : host;
   return {
     host,
     port,
-    tlsCert: e.SCRIBE_LOOP_TLS_CERT || "",
-    tlsKey: e.SCRIBE_LOOP_TLS_KEY || "",
-    tlsPort: Number(e.SCRIBE_LOOP_TLS_PORT || 8471),
-    dataDir: e.SCRIBE_LOOP_DATA_DIR || path.join(xdg("XDG_DATA_HOME", ".local/share", e), "scribe-loop"),
-    stateDir: path.join(xdg("XDG_STATE_HOME", ".local/state", e), "scribe-loop"),
-    // 資料の URL をエージェントに返すときの、Kindle から見たサーバーの URL（例: http://192.0.2.10:8470）
-    // 具体的な IP で待ち受けるなら、そこから決める
-    publicUrl: e.SCRIBE_LOOP_PUBLIC_URL || (isSpecificHost(host) ? `http://${host.includes(":") ? `[${host}]` : host}:${port}` : ""),
-    // CLI と MCP サーバーが呼ぶサーバーの URL。指定がなければ、この設定で待ち受けるサーバー
-    serverUrl: e.SCRIBE_LOOP_URL || `http://${localHost.includes(":") ? `[${localHost}]` : localHost}:${port}`,
-    // SCRIBE_LOOP_URL で別のマシンのサーバーを指しているときは、自分では起動しない
-    autostart: e.SCRIBE_LOOP_AUTOSTART ? e.SCRIBE_LOOP_AUTOSTART !== "0" : !e.SCRIBE_LOOP_URL,
-    chrome: e.SCRIBE_LOOP_CHROME || "",
-    // 裏で起動するサーバーに、同じ設定を引き継ぐための環境変数
+    dataDir: opts["data-dir"] || path.join(xdg("XDG_DATA_HOME", ".local/share", env), "scribe-loop"),
+    stateDir: path.join(xdg("XDG_STATE_HOME", ".local/state", env), "scribe-loop"),
+    // 資料の URL をエージェントに返すときの、Kindle から見たサーバーの URL
+    publicUrl: opts["public-url"] || (lan ? `http://${bracket(lan)}:${port}` : ""),
+    chrome: opts.chrome || "",
+    // CLI と MCP サーバーが呼ぶサーバー。--url で別のマシンを指したときは、自分では起動しない
+    serverUrl: opts.url || `http://${bracket(local)}:${port}`,
+    autostart: !opts.url,
+    // 裏で起動するサーバーに渡すフラグ
+    serveArgs: [
+      "--host", host,
+      "--port", String(port),
+      ...(opts["data-dir"] ? ["--data-dir", opts["data-dir"]] : []),
+      ...(opts["public-url"] ? ["--public-url", opts["public-url"]] : []),
+      ...(opts.chrome ? ["--chrome", opts.chrome] : []),
+    ],
     env,
   };
 }

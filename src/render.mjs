@@ -1,7 +1,7 @@
 // 資料と手書きを重ねた画像を作る。
 // playwright-core と Chrome（または Chromium）があるときだけ動く。なければ null を返す。
 //
-// SCRIBE_LOOP_CHROME に Chrome の実行ファイルを指定できる。指定がなければよくある場所を探す。
+// Chrome の実行ファイルは --chrome で指定できる。指定がなければよくある場所を探す。
 
 import fs from "node:fs";
 import path from "node:path";
@@ -17,7 +17,7 @@ const CANDIDATES = [
 
 let browserPromise = null;
 
-async function getBrowser() {
+async function getBrowser(chrome) {
   if (browserPromise) return browserPromise;
   browserPromise = (async () => {
     let chromium;
@@ -26,7 +26,7 @@ async function getBrowser() {
     } catch {
       return null;
     }
-    const executablePath = process.env.SCRIBE_LOOP_CHROME || CANDIDATES.find((p) => fs.existsSync(p));
+    const executablePath = chrome || CANDIDATES.find((p) => fs.existsSync(p));
     if (!executablePath) return null;
     return chromium.launch({ executablePath });
   })().catch((err) => {
@@ -105,12 +105,12 @@ export function alignStrokes(strokes, deviceLayout, serverRects, deviceContentHe
 }
 
 // ページごとの PNG を outDir に書き、ファイル名の配列を返す。作れなければ null。
-export async function renderPages({ html, strokes, surface, outDir }) {
+export async function renderPages({ html, strokes, surface, outDir, chrome }) {
   const width = Math.round((surface && surface.width) || 930);
   const pageHeight = Math.round((surface && surface.pageHeight) || 1132);
   const manifest = path.join(outDir, "pages.json");
   if (fs.existsSync(manifest)) return JSON.parse(fs.readFileSync(manifest, "utf8"));
-  const browser = await getBrowser();
+  const browser = await getBrowser(chrome);
   if (!browser) return null;
   const page = await browser.newPage({ viewport: { width, height: pageHeight } });
   try {

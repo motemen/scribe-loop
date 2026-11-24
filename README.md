@@ -31,54 +31,39 @@ Kindle Scribe の画面:
 
 ## サーバー
 
-Node.js 20 以上。サーバー自体は依存なしで動きます。認証はないので、LAN の中だけで使ってください。
+Node.js 20 以上。サーバー自体は依存なしで動きます。認証はありません。既定ですべてのインターフェース（`0.0.0.0`）で待ち受けるので、信頼できる LAN の中だけで使ってください。
 
-サーバーを別に起動しておく必要はありません。`scribe-loop` のコマンド（`push` や `mcp` など）は、サーバーが立っていなければ裏で起動します（[k1LoW/mo](https://github.com/k1LoW/mo) と同じ方式です）。
+サーバーを別に起動しておく必要はありません。`scribe-loop` のコマンド（`push` や `mcp` など）は、サーバーが立っていなければ、同じフラグで裏で起動します（[k1LoW/mo](https://github.com/k1LoW/mo) と同じ方式です）。
 
 ```sh
 npm install                 # 任意: 合成画像を作るための playwright-core
 npm link                    # scribe-loop コマンドを使えるようにする（任意）
 
 scribe-loop start           # 裏で起動する（ほかのコマンドでも自動で起動する）
-scribe-loop status          # 状態、URL、データとログの場所
+scribe-loop status          # 状態、Kindle で開く URL、データとログの場所
 scribe-loop stop
 scribe-loop restart         # 更新したあとなど
-scribe-loop serve           # 手前で動かす（デバッグや systemd 用）
+scribe-loop serve           # 手前で動かす（デバッグ用）
 ```
 
-Kindle Scribe のブラウザで `http://<サーバーの LAN 側の IP>:8470/` を開き、ブックマークします。サーバーはマシンを再起動すると止まるので、そのあとは何かコマンドを一度実行するか、Claude Code のセッションを開くと立ち上がります（MCP サーバーが起動するときにサーバーも起動します）。
+Kindle Scribe のブラウザで `scribe-loop status` が表示する URL（`http://<サーバーの LAN 側の IP>:8470/`）を開き、ブックマークします。サーバーはマシンを再起動すると止まるので、そのあとは何かコマンドを一度実行するか、Claude Code のセッションを開くと立ち上がります（MCP サーバーが起動するときにサーバーも起動します）。
 
-### 設定
+### フラグ
 
-設定は `~/.config/scribe-loop/env`（`SCRIBE_LOOP_CONFIG` で変えられる）に `KEY=VALUE` の形で書きます。環境変数のほうが優先します。裏で起動するサーバーも同じ設定を読むので、MCP の登録で環境変数を渡す必要はありません。
+設定はすべてコマンドラインのフラグで渡します。どのコマンドにも付けられ、裏で起動するサーバーにもそのまま渡ります。
 
-Kindle から使うには、少なくとも待ち受ける IP を書きます（既定の 127.0.0.1 では、ほかの端末から届きません）。認証のないサーバーなので、LAN に出すかどうかは明示して決めます。
-
-```sh
-# ~/.config/scribe-loop/env
-SCRIBE_LOOP_HOST=192.0.2.10
-```
-
-| 設定 | 既定 | 内容 |
+| フラグ | 既定 | 内容 |
 | --- | --- | --- |
-| `SCRIBE_LOOP_HOST` | `127.0.0.1` | 待ち受ける IP。端末から使うには LAN 側の IP（または `0.0.0.0`）にする |
-| `SCRIBE_LOOP_PORT` | `8470` | HTTP のポート |
-| `SCRIBE_LOOP_TLS_CERT` / `SCRIBE_LOOP_TLS_KEY` | （なし） | 証明書と鍵の PEM。両方あると HTTPS でも待ち受ける |
-| `SCRIBE_LOOP_TLS_PORT` | `8471` | HTTPS のポート |
-| `SCRIBE_LOOP_DATA_DIR` | `$XDG_DATA_HOME/scribe-loop` | 資料・書き込み・フィードバックの置き場所 |
-| `SCRIBE_LOOP_PUBLIC_URL` | `SCRIBE_LOOP_HOST` が具体的な IP ならそこから | エージェントに資料の URL を返すときの、Kindle から見たサーバーの URL |
-| `SCRIBE_LOOP_CHROME` | よくある場所を探す | 合成画像を作るときに使う Chrome / Chromium |
-| `SCRIBE_LOOP_URL` | 上の設定から決まる | CLI と MCP が呼ぶサーバー。別のマシンのサーバーを指すと、自動では起動しない |
+| `--host` | `0.0.0.0` | 待ち受けるアドレス |
+| `--port` | `8470` | 待ち受けるポート |
+| `--data-dir` | `$XDG_DATA_HOME/scribe-loop` | 資料・書き込み・フィードバックの置き場所 |
+| `--public-url` | LAN 側の IP から推測 | エージェントに資料の URL を返すときの、Kindle から見たサーバーの URL |
+| `--chrome` | よくある場所を探す | 合成画像を作るときに使う Chrome / Chromium |
+| `--url` | （なし） | 別のマシンで動いているサーバーを使う。このときは自分では起動しない |
 
 ログは `$XDG_STATE_HOME/scribe-loop/server.log` に書きます。
 
 資料と手書きを重ねた画像は、`playwright-core`（`npm install` で入る任意の依存）と Chrome / Chromium があるときだけ作ります。ないときは、手書きの線だけの SVG と、線の下にある文字をエージェントに渡します。
-
-HTTPS は必須ではありません（初代 Scribe では、HTTPS にしても描画は速くなりませんでした）。使う場合は、自己署名の証明書をサーバーに渡すか、Caddy などのリバースプロキシで TLS を終端して HTTP のポートに転送します。
-
-### 常に動かしておきたいとき
-
-マシンの起動と同時にサーバーを立てたいなら、`scribe-loop serve` を systemd などに登録します。コマンドは、すでに立っているサーバーをそのまま使います。
 
 ## エージェントから使う
 
@@ -90,6 +75,7 @@ Claude Code の場合:
 
 ```sh
 claude mcp add -s user scribe-loop -- node /path/to/scribe-loop/bin/scribe-loop.mjs mcp
+# フラグを足す例: ... mcp --port 8480 --data-dir ~/scribe
 ```
 
 | ツール | 内容 |
@@ -111,7 +97,7 @@ claude --dangerously-load-development-channels server:scribe-loop
 
 - 起動時に確認の画面が出るので、ローカルでの開発用であることを選びます（独自の channel は、プレビューのあいだ許可リストに載っていないため）。
 - イベントが届くのは、そのセッションが開いているあいだだけです。作業中に届いたものは、区切りのよいところでまとめて処理されます。
-- 通知を止めるには、MCP サーバーの環境変数に `SCRIBE_LOOP_CHANNEL=0` を設定します。
+- 通知を止めるには、MCP サーバーに `--no-channel` を付けます。
 
 ### CLI
 
