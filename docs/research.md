@@ -65,6 +65,12 @@
   - 取り消し線は削除、矢印は挿入、と記号の意味をツールの説明で LLM に伝える。
   - 処理が終わったら ack で処理済みにする。
 
+## 実機で分かったこと
+
+- 初代 Kindle Scribe（ファームウェア最新、2026年11月）の標準ブラウザの UA は `Silk/80.4.14 like Chrome/80.0.3987.119`（Android 9）。
+- PointerEvent と `getCoalescedEvents` は使える。Service Worker は使えない。
+- **ペンも `pointerType: "touch"` で届く**（`Touch.force` は null、`radiusX` は 25 で一定）。Hermes Notebook がペンと手をボタンで切り替えているのは、このためと考えられる。
+
 ## このプロジェクトへの示唆
 
 - ブラウザでは、ネイティブのような低遅延の工夫はできない。実機で、遅延が許容できるかを最初に確かめる。

@@ -125,7 +125,7 @@
 
   function widthFor(pressure, pointerType) {
     // 筆圧が取れているときだけ太さを変える（取れない環境では 0.5 か 0 が来る）
-    if (pointerType === "pen" && pressure > 0 && pressure !== 0.5) return BASE_WIDTH * (0.4 + 1.2 * pressure);
+    if (pressure > 0 && pressure !== 0.5 && pressure !== 1) return BASE_WIDTH * (0.4 + 1.2 * pressure);
     return BASE_WIDTH;
   }
 
@@ -219,21 +219,15 @@
 
   function onDown(e) {
     var info = describe(e);
-    if (e.pointerType === "touch") {
-      if (penDown) {
-        // ペンで書いている最中の指 = 手のひらと見なす
-        SL.log("palm", info);
-        return stop(e);
-      }
-      if (gesture) return stop(e);
-      gesture = { kind: "pan", pointerId: e.pointerId, y: e.clientY, startY: e.clientY, info: info };
+    SL.log("down", info);
+    // Kindle Scribe（Silk / Chrome 80）はペンも pointerType "touch" で渡すので、
+    // pointerType では区別しない。書いている最中に別の指が来たら手のひらと見なして捨てる。
+    if (gesture && gesture.pointerId !== e.pointerId) {
+      SL.log("palm", { info: info, busy: gesture.kind });
       return stop(e);
     }
-    if (gesture && gesture.pointerId !== e.pointerId) {
-      SL.log("down-while-busy", { info: info, busy: gesture.kind });
-    }
     if (current) finishStroke(e); // up が来ないまま次の down が来たとき
-    penDown = e.pointerType === "pen";
+    penDown = true;
     if (tool === "hand") {
       gesture = { kind: "pan", pointerId: e.pointerId, y: e.clientY, startY: e.clientY, info: info };
       return stop(e);
@@ -317,7 +311,7 @@
     if (gesture.pointerId !== undefined && e.pointerId !== undefined && gesture.pointerId !== e.pointerId) return stop(e);
     var g = gesture;
     gesture = null;
-    if (e.pointerType === "pen" || g.kind !== "pan") penDown = false;
+    penDown = false;
     if (g.kind === "pan") {
       var total = e.clientY - g.startY;
       if (LAYOUT === "paged" && Math.abs(total) > 80) goPage(page + (total < 0 ? 1 : -1));
@@ -352,7 +346,7 @@
     }
     var pressures = [];
     for (var k in stats.pressures) if (Object.prototype.hasOwnProperty.call(stats.pressures, k)) pressures.push(Number(k));
-    if (pressures.length > 2 && stroke.pointerType === "pen") {
+    if (pressures.length > 2) {
       var sum = 0;
       for (var i = 0; i < stroke.points.length; i += 1) sum += widthFor(stroke.points[i][2], stroke.pointerType);
       stroke.width = Math.round((sum / stroke.points.length) * 100) / 100;
