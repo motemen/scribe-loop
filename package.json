@@ -9,7 +9,6 @@
   },
   "scripts": {
     "start": "node bin/scribe-loop.mjs serve",
-    "prototype": "node prototype/server.mjs",
     "test": "node --test test/"
   },
   "bin": {

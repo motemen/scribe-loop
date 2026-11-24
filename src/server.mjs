@@ -128,7 +128,6 @@ export function createHandler(store, { publicUrl, cfg = {}, onShutdown = () => {
     // ---- API ----
     const [, resource, id, sub, subId] = parts;
 
-    if (resource === "health") return send(res, 200, { ok: true });
     if (resource === "status" && method === "GET") {
       return send(res, 200, {
         app: "scribe-loop",

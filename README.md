@@ -113,10 +113,6 @@ scribe-loop show <フィードバックの ID> [--out <ディレクトリ>]   # 
 scribe-loop done <フィードバックの ID>
 ```
 
-## 検証用のプロトタイプ
-
-`prototype/` には、Kindle Scribe の標準ブラウザで手書きが実用になるかを確かめたときのページがあります（手順は [docs/verification.md](docs/verification.md)）。`node prototype/server.mjs` で動き、待ち受けるアドレスは環境変数 `SCRIBE_LOOP_HOST`、ポートは `SCRIBE_LOOP_PORT` で指定します（既定は 127.0.0.1 の 8470 番なので、本体のサーバーとは別のポートにしてください）。
-
 ## 開発
 
 ```sh

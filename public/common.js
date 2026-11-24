@@ -77,10 +77,6 @@
     xhr.send();
   };
 
-  SL.log = function (event, data) {
-    if (window.console && console.log) console.log(event, data ? JSON.stringify(data) : "");
-  };
-
   // ボタン。ペンで書いた直後は click が来ないことがある（Hermes Notebook の知見）ので、
   // pointerup / touchend で反応し、そのあとに来る click は重複として捨てる。
   var loadedAt = SL.now();
