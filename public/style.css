@@ -38,6 +38,18 @@ button[disabled] { border-style: dashed; color: #777; }
 
 /* 書き込みの画面 */
 #toolbar { padding: 6px 8px 2px; border-bottom: 2px solid #000; }
+#toolbar .row { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: start; -webkit-align-items: flex-start; align-items: flex-start; }
+#toolbar .tools { -webkit-box-flex: 1; -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; }
+#sendBtn {
+  -webkit-flex: 0 0 auto;
+  flex: 0 0 auto;
+  margin: 0 0 4px 12px;
+  padding: 4px 22px;
+  border: 6px double #000;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 19px;
+}
 #title { font-size: 15px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #status { font-size: 15px; display: inline-block; vertical-align: middle; margin-left: 4px; }
 #viewport { position: relative; overflow: hidden; }
