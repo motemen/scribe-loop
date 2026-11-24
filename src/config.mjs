@@ -32,6 +32,10 @@ export function loadConfigFile(file) {
   return out;
 }
 
+function isSpecificHost(host) {
+  return !["0.0.0.0", "::", "127.0.0.1", "::1", "localhost"].includes(host);
+}
+
 export function config(env = process.env) {
   const e = { ...loadConfigFile(configPath(env)), ...env };
   const host = e.SCRIBE_LOOP_HOST || "127.0.0.1";
@@ -47,7 +51,8 @@ export function config(env = process.env) {
     dataDir: e.SCRIBE_LOOP_DATA_DIR || path.join(xdg("XDG_DATA_HOME", ".local/share", e), "scribe-loop"),
     stateDir: path.join(xdg("XDG_STATE_HOME", ".local/state", e), "scribe-loop"),
     // 資料の URL をエージェントに返すときの、Kindle から見たサーバーの URL（例: http://192.0.2.10:8470）
-    publicUrl: e.SCRIBE_LOOP_PUBLIC_URL || "",
+    // 具体的な IP で待ち受けるなら、そこから決める
+    publicUrl: e.SCRIBE_LOOP_PUBLIC_URL || (isSpecificHost(host) ? `http://${host.includes(":") ? `[${host}]` : host}:${port}` : ""),
     // CLI と MCP サーバーが呼ぶサーバーの URL。指定がなければ、この設定で待ち受けるサーバー
     serverUrl: e.SCRIBE_LOOP_URL || `http://${localHost.includes(":") ? `[${localHost}]` : localHost}:${port}`,
     // SCRIBE_LOOP_URL で別のマシンのサーバーを指しているときは、自分では起動しない

@@ -52,10 +52,11 @@ Kindle Scribe のブラウザで `http://<サーバーの LAN 側の IP>:8470/` 
 
 設定は `~/.config/scribe-loop/env`（`SCRIBE_LOOP_CONFIG` で変えられる）に `KEY=VALUE` の形で書きます。環境変数のほうが優先します。裏で起動するサーバーも同じ設定を読むので、MCP の登録で環境変数を渡す必要はありません。
 
+Kindle から使うには、少なくとも待ち受ける IP を書きます（既定の 127.0.0.1 では、ほかの端末から届きません）。認証のないサーバーなので、LAN に出すかどうかは明示して決めます。
+
 ```sh
-# ~/.config/scribe-loop/env の例
+# ~/.config/scribe-loop/env
 SCRIBE_LOOP_HOST=192.0.2.10
-SCRIBE_LOOP_PUBLIC_URL=http://192.0.2.10:8470
 ```
 
 | 設定 | 既定 | 内容 |
@@ -65,7 +66,7 @@ SCRIBE_LOOP_PUBLIC_URL=http://192.0.2.10:8470
 | `SCRIBE_LOOP_TLS_CERT` / `SCRIBE_LOOP_TLS_KEY` | （なし） | 証明書と鍵の PEM。両方あると HTTPS でも待ち受ける |
 | `SCRIBE_LOOP_TLS_PORT` | `8471` | HTTPS のポート |
 | `SCRIBE_LOOP_DATA_DIR` | `$XDG_DATA_HOME/scribe-loop` | 資料・書き込み・フィードバックの置き場所 |
-| `SCRIBE_LOOP_PUBLIC_URL` | （なし） | エージェントに資料の URL を返すときの、Kindle から見たサーバーの URL |
+| `SCRIBE_LOOP_PUBLIC_URL` | `SCRIBE_LOOP_HOST` が具体的な IP ならそこから | エージェントに資料の URL を返すときの、Kindle から見たサーバーの URL |
 | `SCRIBE_LOOP_CHROME` | よくある場所を探す | 合成画像を作るときに使う Chrome / Chromium |
 | `SCRIBE_LOOP_URL` | 上の設定から決まる | CLI と MCP が呼ぶサーバー。別のマシンのサーバーを指すと、自動では起動しない |
 
