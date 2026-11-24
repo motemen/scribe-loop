@@ -21,7 +21,11 @@
   var LAYOUT = params.layout === "scroll" ? "scroll" : "paged";
   var RENDER = params.render === "svg" ? "svg" : "canvas";
   // input=raw なら pointerrawupdate で点を受け取る（secure context でしか使えない）
-  var RAW = params.input === "raw" && "onpointerrawupdate" in window;
+  // window.onpointerrawupdate がなくてもイベント自体は来るかもしれないので、
+  // input=raw のときは常に登録し、実際に届いたら使う。
+  var RAW_WANTED = params.input === "raw";
+  var RAW = RAW_WANTED && "onpointerrawupdate" in window;
+  var rawCount = 0;
   var BLANK_PAGES = 3;
   var BASE_WIDTH = 2.5;
   var SVG_NS = "http://www.w3.org/2000/svg";
@@ -361,6 +365,7 @@
       render: RENDER,
       layout: LAYOUT,
       input: RAW ? "raw" : "move",
+      rawEvents: rawCount,
       pointerType: stroke.pointerType,
       points: stroke.points.length,
       events: stats.events,
@@ -375,6 +380,7 @@
       down: stats.down,
       endType: e && e.type
     });
+    rawCount = 0;
     queueOp({ kind: "add", stroke: stroke });
     setStatus();
   }
@@ -428,7 +434,16 @@
     if (window.PointerEvent) {
       SL.on(ink, "pointerdown", onDown);
       SL.on(ink, "pointermove", onMove);
-      if (RAW) SL.on(ink, "pointerrawupdate", onMove);
+      if (RAW_WANTED) {
+        SL.on(ink, "pointerrawupdate", function (e) {
+          rawCount += 1;
+          if (!RAW) {
+            RAW = true;
+            SL.log("raw-arrived", { secure: !!window.isSecureContext });
+          }
+          onMove(e);
+        });
+      }
       SL.on(ink, "pointerup", onUp);
       SL.on(ink, "pointercancel", function (e) {
         SL.log("pointercancel", describe(e));

@@ -206,10 +206,13 @@
 
   // ボタン。ペンで書いた直後は click が来ないことがある（Hermes Notebook の知見）ので、
   // pointerup / touchend で反応し、そのあとに来る click は重複として捨てる。
+  var loadedAt = SL.now();
   SL.tap = function (element, handler) {
     var armed = false;
     var firedAt = 0;
     function fire(event, how) {
+      // 前のページで押した指の click が、遷移した先のボタンに届くことがあるので、開いた直後は無視する
+      if (SL.now() - loadedAt < 1000) return;
       if (how !== "click") firedAt = SL.now();
       handler(event);
     }
