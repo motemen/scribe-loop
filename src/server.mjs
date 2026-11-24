@@ -288,7 +288,7 @@ export function startServer(cfg = config()) {
     server.listen(port, cfg.host, () => console.log(`scribe-loop: ${label} (pid ${process.pid}, data: ${cfg.dataDir})`));
     servers.push(server);
   };
-  listen(http.createServer(handler), cfg.port, cfg.publicUrl ? `${label} (Kindle: ${cfg.publicUrl}/)` : label);
+  listen(http.createServer(handler), cfg.port, cfg.publicUrl ? `${label} (device: ${cfg.publicUrl}/)` : label);
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 }

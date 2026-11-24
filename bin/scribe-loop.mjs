@@ -77,7 +77,7 @@ async function ensure() {
 function printStatus(status) {
   console.log(`running\tpid ${status.pid}\tversion ${status.version}\tsince ${status.startedAt}`);
   console.log(`listen\t${status.host}:${status.port}`);
-  if (status.publicUrl) console.log(`kindle\t${status.publicUrl}/`);
+  if (status.publicUrl) console.log(`device\t${status.publicUrl}/`);
   console.log(`data\t${status.dataDir}`);
   console.log(`log\t${logFile(cfg)}`);
 }
@@ -180,7 +180,7 @@ async function main() {
         for (const f of list) {
           console.log([f.id, f.mode, f.documentTitle].join("\t"));
         }
-        console.log(`scribe_get_feedback（または scribe-loop show <ID>）で読んでください。`);
+        console.log("Read it with scribe_get_feedback (or scribe-loop show <ID>).");
       };
       if (values.pending) {
         const pending = await client.listFeedback("pending");

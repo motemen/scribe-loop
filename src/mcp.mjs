@@ -18,9 +18,9 @@ function waitCommand(cfg) {
 function waitInstructions(cfg) {
   return `
 
-人が Kindle で「送る」を押すのを待つとき（資料を登録して読んでもらう、など）、このセッションに channel のイベント（<channel source="scribe-loop" ...>）が届かない場合は、次のコマンドをバックグラウンドで実行して待つ。新しいフィードバックが届くとコマンドが終わり、その ID を出力するので、scribe_get_feedback で読む。
+Waiting for the user to send feedback (for example, after pushing a document for them to read): if this session does not receive channel events (<channel source="scribe-loop" ...>), run the following command in the background. It exits when new feedback arrives and prints its ID; then read it with scribe_get_feedback.
   ${waitCommand(cfg)}
-channel のイベントが届くセッションでは、このコマンドは要らない。`;
+Sessions that receive channel events do not need this command.`;
 }
 
 const PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
@@ -30,14 +30,14 @@ const TOOLS = [
   {
     name: "scribe_push_document",
     description:
-      "Kindle Scribe で読む資料（HTML）を登録する。人に頼まれてフィードバックへの回答や改訂版を Kindle に返すときは、in_reply_to にそのフィードバックの ID を渡す（そのフィードバックは処理済みになる）。\n\n" +
+      "Push a document (HTML) for the user to read and annotate by hand on their handwriting device. When the user asks you to send an answer or a revised version back to the device in response to feedback, pass that feedback's ID as in_reply_to (the feedback is then marked done).\n\n" +
       AGENT_GUIDE,
     inputSchema: {
       type: "object",
       properties: {
-        title: { type: "string", description: "資料の題名" },
-        html: { type: "string", description: "資料の HTML（文書全体か、body の中身）" },
-        in_reply_to: { type: "string", description: "返信する対象のフィードバックの ID（任意）" },
+        title: { type: "string", description: "Document title" },
+        html: { type: "string", description: "Document HTML (a full document or the body contents)" },
+        in_reply_to: { type: "string", description: "ID of the feedback this document answers (optional)" },
       },
       required: ["html"],
     },
@@ -45,30 +45,30 @@ const TOOLS = [
   {
     name: "scribe_revise_document",
     description:
-      "登録済みの資料を、新しい版に書き換える（Kindle では同じ資料のまま新しい版に切り替わる）。前の版と、その版への書き込みは残る。新しい版は書き込みなしで始まる。フィードバックを受けて書き換えるときは feedback_id を渡す（そのフィードバックは処理済みになる）。人がセッションで「書き換えて」と頼んだとき、またはフィードバックの希望が書き換えのときに使う。",
+      "Revise a pushed document in place as a new revision (the device switches to the new revision of the same document). The previous revision and its handwriting are kept; the new revision starts without handwriting. When revising in response to feedback, pass feedback_id (the feedback is then marked done). Use this when the user asks you in the session to revise the document, or when the feedback requests a revision.",
     inputSchema: {
       type: "object",
       properties: {
         document_id: { type: "string" },
-        html: { type: "string", description: "新しい版の HTML（全体）" },
-        title: { type: "string", description: "題名を変えるときだけ" },
-        feedback_id: { type: "string", description: "反映したフィードバックの ID（任意）" },
+        html: { type: "string", description: "HTML of the new revision (the whole document)" },
+        title: { type: "string", description: "Only when changing the title" },
+        feedback_id: { type: "string", description: "ID of the feedback reflected in this revision (optional)" },
       },
       required: ["document_id", "html"],
     },
   },
   {
     name: "scribe_list_feedback",
-    description: "人が Kindle Scribe から送ったフィードバックの一覧。既定では未処理（pending）だけを返す。",
+    description: "List feedback the user sent from the handwriting device. Returns only pending feedback by default.",
     inputSchema: {
       type: "object",
-      properties: { status: { type: "string", enum: ["pending", "processing", "done", "all"], description: "既定は pending" } },
+      properties: { status: { type: "string", enum: ["pending", "processing", "done", "all"], description: "Defaults to pending" } },
     },
   },
   {
     name: "scribe_get_feedback",
     description:
-      "フィードバックの中身を取得する。元の資料の HTML、線ごとの位置とその下の文字、資料と手書きを重ねたページの画像（作れる場合）を返す。取得すると状態を processing にする。",
+      "Get a piece of feedback: the source HTML of the document, the position of each stroke and the text under it, and page images with the handwriting drawn over the document (when available). Marks the feedback as processing.",
     inputSchema: {
       type: "object",
       properties: { feedback_id: { type: "string" } },
@@ -77,20 +77,20 @@ const TOOLS = [
   },
   {
     name: "scribe_update_feedback",
-    description: "フィードバックの状態を変える。会話だけで対応し終えたら done にする。",
+    description: "Change the status of a piece of feedback. Mark it done after you have responded to it in the conversation.",
     inputSchema: {
       type: "object",
       properties: {
         feedback_id: { type: "string" },
         status: { type: "string", enum: ["pending", "processing", "done"] },
-        note: { type: "string", description: "メモ（任意）" },
+        note: { type: "string", description: "Note (optional)" },
       },
       required: ["feedback_id", "status"],
     },
   },
   {
     name: "scribe_list_documents",
-    description: "登録されている資料の一覧（新しい順）。",
+    description: "List pushed documents, newest first.",
     inputSchema: { type: "object", properties: {} },
   },
 ];
@@ -105,19 +105,19 @@ async function callTool(client, name, args) {
       const meta = await client.pushDocument({ title: args.title, html: args.html, inReplyTo: args.in_reply_to });
       return [
         text(
-          `登録しました: ${meta.title}（${meta.id}）\nKindle Scribe の一覧に出ます。${meta.url}\n` +
-            `人が書き込んで送るのを待つなら、channel のイベントが届かないセッションでは次をバックグラウンドで実行する: ${waitCommand(cfgRef)}`,
+          `Pushed: ${meta.title} (${meta.id})\nIt appears in the document list on the device. ${meta.url}\n` +
+            `To wait for the user's handwritten feedback in a session that does not receive channel events, run this in the background: ${waitCommand(cfgRef)}`,
         ),
       ];
     }
     case "scribe_revise_document": {
       const meta = await client.reviseDocument(args.document_id, { html: args.html, title: args.title, feedbackId: args.feedback_id });
-      return [text(`書き換えました: ${meta.title}（${meta.id}）の版 ${meta.revision}。Kindle で開いている場合は「新しい版」から切り替えられます。${meta.url}`)];
+      return [text(`Revised: ${meta.title} (${meta.id}), revision ${meta.revision}. If the document is open on the device, the user can switch to the new revision there. ${meta.url}`)];
     }
     case "scribe_list_feedback": {
       const status = args.status === "all" ? undefined : args.status || "pending";
       const list = await client.listFeedback(status);
-      return [text(list.length ? list : `${status || ""} のフィードバックはありません。`)];
+      return [text(list.length ? list : `No ${status || ""} feedback.`)];
     }
     case "scribe_get_feedback": {
       const fb = await client.getFeedback(args.feedback_id);
@@ -133,14 +133,14 @@ async function callTool(client, name, args) {
       const withInk = pages.pages.filter((p) => p.hasInk).slice(0, MAX_IMAGES);
       if (pages.available) {
         for (const p of withInk) {
-          content.push(text(`ページ ${p.page}（資料と手書きを重ねた画像）`));
+          content.push(text(`Page ${p.page} (handwriting drawn over the document)`));
           const png = await client.page(fb.id, p.file);
           content.push({ type: "image", data: png.toString("base64"), mimeType: "image/png" });
         }
         const rest = pages.pages.filter((p) => p.hasInk).length - withInk.length;
-        if (rest > 0) content.push(text(`ほかに書き込みのあるページが ${rest} ページあります（画像は省略）。`));
+        if (rest > 0) content.push(text(`${rest} more page(s) have handwriting (images omitted).`));
       } else {
-        content.push(text("資料と手書きを重ねた画像は作れませんでした（サーバーに playwright-core と Chrome がない）。手書きの線だけの SVG を付けます。"));
+        content.push(text("Could not render the handwriting over the document (the server has no playwright-core or Chrome). Attaching an SVG of the strokes only."));
         content.push(text(await client.inkSvg(fb.id)));
       }
       return content;
@@ -158,8 +158,8 @@ async function callTool(client, name, args) {
 
 const CHANNEL_INSTRUCTIONS = `
 
-Claude Code を channels つきで起動している場合（claude --dangerously-load-development-channels server:scribe-loop など）、人が Kindle Scribe で「送る」を押すと <channel source="scribe-loop" feedback_id="..."> のイベントが届く。
-イベントが届いたら、scribe_get_feedback でそのフィードバックを読み、書き込みの内容をセッションの会話で受け止めて応答する（Kindle への資料の返信は、人が頼んだときだけ）。セッションで別の作業をしている途中なら、区切りのよいところで対応する。`;
+When Claude Code runs with channels enabled (for example, claude --dangerously-load-development-channels server:scribe-loop), a <channel source="scribe-loop" feedback_id="..."> event arrives when the user presses Send on the device.
+When an event arrives, read the feedback with scribe_get_feedback and respond to the handwriting in the conversation (send a document back to the device only when the user asks). If you are in the middle of other work, handle it at a good stopping point.`;
 
 // 新しいフィードバックを待ち、届いたら Claude Code のセッションに channel のイベントとして送る
 async function watchFeedback(client, notify) {
@@ -168,8 +168,8 @@ async function watchFeedback(client, notify) {
     const pending = await client.listFeedback("pending");
     if (pending.length) {
       notify(
-        `Kindle Scribe から未処理のフィードバックが ${pending.length} 件あります:\n` +
-          pending.map((f) => `- ${f.id}「${f.documentTitle}」（線 ${f.newStrokes} 本）`).join("\n"),
+        `There is pending handwritten feedback (${pending.length}):\n` +
+          pending.map((f) => `- ${f.id} on "${f.documentTitle}" (${f.newStrokes} strokes)`).join("\n"),
         { kind: "pending", count: String(pending.length) },
       );
     }
@@ -182,10 +182,10 @@ async function watchFeedback(client, notify) {
       for (const f of feedback) {
         const revise = f.mode === "revise";
         notify(
-          `Kindle Scribe で「${f.documentTitle}」への書き込みが送られました（フィードバック ${f.id}、線 ${f.newStrokes} 本）。` +
+          `The user sent handwriting on "${f.documentTitle}" (feedback ${f.id}, ${f.newStrokes} strokes). ` +
             (revise
-              ? "資料は書き換えモードです。scribe_get_feedback で読み、書き込みを反映して scribe_revise_document でこの資料を書き換えてください。"
-              : "scribe_get_feedback で読んでください。"),
+              ? "The document is in revise mode: read it with scribe_get_feedback and revise the document with scribe_revise_document to reflect the handwriting."
+              : "Read it with scribe_get_feedback."),
           { kind: "feedback", mode: revise ? "revise" : "respond", feedback_id: f.id, document_id: f.documentId },
         );
         if (f.createdAt > after) after = f.createdAt;
@@ -249,7 +249,7 @@ export function runMcp(cfg, { channel = true, ensure = null } = {}) {
           result = { content: await callTool(client, params.name, params.arguments || {}) };
         } catch (err) {
           if (err.code === -32602) throw err;
-          result = { content: [text(`エラー: ${err.message}`)], isError: true };
+          result = { content: [text(`Error: ${err.message}`)], isError: true };
         }
       } else {
         throw Object.assign(new Error(`method not found: ${method}`), { code: -32601 });

@@ -1,7 +1,7 @@
 {
   "name": "@motemen/scribe-loop",
   "version": "0.1.0",
-  "description": "Kindle Scribe の標準ブラウザで、AI エージェントの資料を読み、手書きで返すための環境",
+  "description": "Read AI agent documents on a handwriting device, write on them with a pen, and send the handwriting back",
   "type": "module",
   "bin": {
     "scribe-loop": "bin/scribe-loop.mjs"
@@ -9,7 +9,8 @@
   "files": [
     "bin/",
     "src/",
-    "public/"
+    "public/",
+    "README.ja.md"
   ],
   "engines": {
     "node": ">=20"
