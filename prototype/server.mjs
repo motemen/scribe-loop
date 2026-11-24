@@ -8,6 +8,7 @@
 // 端末から使うときは SCRIBE_LOOP_HOST に LAN 側の IP（または 0.0.0.0）を指定する。
 
 import http from "node:http";
+import https from "node:https";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -18,6 +19,11 @@ const PORT = Number(process.env.SCRIBE_LOOP_PORT || 8470);
 const DATA_DIR =
   process.env.SCRIBE_LOOP_DATA_DIR ||
   path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share"), "scribe-loop", "prototype");
+// 証明書と鍵を渡すと、HTTP に加えて HTTPS でも待ち受ける。
+// pointerrawupdate などは secure context（HTTPS）でしか使えないため。
+const TLS_CERT = process.env.SCRIBE_LOOP_TLS_CERT || "";
+const TLS_KEY = process.env.SCRIBE_LOOP_TLS_KEY || "";
+const TLS_PORT = Number(process.env.SCRIBE_LOOP_TLS_PORT || 8471);
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
 
 const LOG_DIR = path.join(DATA_DIR, "logs");
@@ -200,13 +206,21 @@ async function handle(req, res) {
   send(res, 404, { error: "not found" });
 }
 
-const server = http.createServer((req, res) => {
+function onRequest(req, res) {
   handle(req, res).catch((err) => {
     if (!res.headersSent) send(res, err.status || 500, { error: err.message });
     if (!err.status) console.error(err);
   });
-});
+}
 
-server.listen(PORT, HOST, () => {
+http.createServer(onRequest).listen(PORT, HOST, () => {
   console.log(`scribe-loop prototype: http://${HOST}:${PORT}/ (data: ${DATA_DIR})`);
 });
+
+if (TLS_CERT && TLS_KEY) {
+  https
+    .createServer({ cert: fs.readFileSync(TLS_CERT), key: fs.readFileSync(TLS_KEY) }, onRequest)
+    .listen(TLS_PORT, HOST, () => {
+      console.log(`scribe-loop prototype: https://${HOST}:${TLS_PORT}/`);
+    });
+}

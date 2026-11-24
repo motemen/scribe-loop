@@ -20,6 +20,8 @@
   var CONTENT = params.content === "text" ? "text" : "blank";
   var LAYOUT = params.layout === "scroll" ? "scroll" : "paged";
   var RENDER = params.render === "svg" ? "svg" : "canvas";
+  // input=raw なら pointerrawupdate で点を受け取る（secure context でしか使えない）
+  var RAW = params.input === "raw" && "onpointerrawupdate" in window;
   var BLANK_PAGES = 3;
   var BASE_WIDTH = 2.5;
   var SVG_NS = "http://www.w3.org/2000/svg";
@@ -69,7 +71,7 @@
 
   function setStatus() {
     var msg = (tool === "pen" ? "ペン" : tool === "eraser" ? "消しゴム" : "手") +
-      " / " + RENDER +
+      " / " + RENDER + (RAW ? "+raw" : (params.input === "raw" ? "（raw 使えず）" : "")) +
       (LAYOUT === "paged" ? " / " + (page + 1) + "/" + pageCount() + "頁" : "") +
       " / 線 " + strokes.length +
       " / " + (outbox.length ? "未送信 " + outbox.length : "送信済み");
@@ -285,6 +287,7 @@
       return stop(e);
     }
     if (gesture.kind !== "draw" || !current) return stop(e);
+    if (RAW && e.type === "pointermove") return stop(e);
     var samples = [e];
     if (typeof e.getCoalescedEvents === "function") {
       try {
@@ -357,6 +360,7 @@
       id: stroke.id,
       render: RENDER,
       layout: LAYOUT,
+      input: RAW ? "raw" : "move",
       pointerType: stroke.pointerType,
       points: stroke.points.length,
       events: stats.events,
@@ -424,6 +428,7 @@
     if (window.PointerEvent) {
       SL.on(ink, "pointerdown", onDown);
       SL.on(ink, "pointermove", onMove);
+      if (RAW) SL.on(ink, "pointerrawupdate", onMove);
       SL.on(ink, "pointerup", onUp);
       SL.on(ink, "pointercancel", function (e) {
         SL.log("pointercancel", describe(e));
@@ -536,7 +541,7 @@
     var renderBtn = document.getElementById("renderBtn");
     renderBtn.textContent = RENDER === "canvas" ? "SVG に" : "Canvas に";
     SL.tap(renderBtn, function () {
-      location.href = "pad.html?doc=" + DOC + "&content=" + CONTENT + "&layout=" + LAYOUT + "&render=" + (RENDER === "canvas" ? "svg" : "canvas");
+      location.href = "pad.html?doc=" + DOC + "&content=" + CONTENT + "&layout=" + LAYOUT + "&render=" + (RENDER === "canvas" ? "svg" : "canvas") + (params.input ? "&input=" + params.input : "");
     });
     var prev = document.getElementById("prevBtn");
     var next = document.getElementById("nextBtn");
@@ -582,7 +587,8 @@
   bindButtons();
   restore();
   setStatus();
-  SL.log("open", { doc: DOC, content: CONTENT, layout: LAYOUT, render: RENDER, viewport: window.innerWidth + "x" + window.innerHeight });
+  if (params.input === "raw" && !RAW) SL.log("raw-unavailable", { secure: !!window.isSecureContext });
+  SL.log("open", { doc: DOC, content: CONTENT, layout: LAYOUT, render: RENDER, input: RAW ? "raw" : "move", viewport: window.innerWidth + "x" + window.innerHeight });
 
   // 文字の組版が終わってから高さを測り直す
   SL.on(window, "load", layout);

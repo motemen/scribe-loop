@@ -23,6 +23,23 @@ Kindle Scribe のブラウザで `http://<サーバーの LAN 側の IP>:8470/` 
 | `SCRIBE_LOOP_HOST` | `127.0.0.1` | 待ち受ける IP。端末から使うには LAN 側の IP（または `0.0.0.0`）にする |
 | `SCRIBE_LOOP_PORT` | `8470` | 待ち受けるポート |
 | `SCRIBE_LOOP_DATA_DIR` | `$XDG_DATA_HOME/scribe-loop/prototype` | ログと書き込みの置き場所 |
+| `SCRIBE_LOOP_TLS_CERT` / `SCRIBE_LOOP_TLS_KEY` | （なし） | 証明書と鍵の PEM ファイル。両方あると HTTPS でも待ち受ける |
+| `SCRIBE_LOOP_TLS_PORT` | `8471` | HTTPS で待ち受けるポート |
+
+### HTTPS
+
+`pointerrawupdate` などは secure context（HTTPS）でしか使えません。HTTPS にするには、次のどちらかを使います。
+
+- サーバーに証明書を渡す。自己署名の証明書でもかまいません（端末のブラウザで警告を一度越える必要があります）。
+
+  ```sh
+  openssl req -x509 -newkey rsa:2048 -nodes -days 825 -subj "/CN=scribe-loop" \
+    -addext "subjectAltName=IP:<サーバーの LAN 側の IP>" \
+    -keyout key.pem -out cert.pem
+  SCRIBE_LOOP_TLS_CERT=cert.pem SCRIBE_LOOP_TLS_KEY=key.pem SCRIBE_LOOP_HOST=... node prototype/server.mjs
+  ```
+
+- Caddy などのリバースプロキシで TLS を終端し、HTTP のポートに転送する。
 
 データの置き場所:
 

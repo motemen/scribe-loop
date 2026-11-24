@@ -168,6 +168,7 @@
       maxTouchPoints: navigator.maxTouchPoints,
       PointerEvent: !!window.PointerEvent,
       getCoalescedEvents: !!(window.PointerEvent && window.PointerEvent.prototype.getCoalescedEvents),
+      pointerrawupdate: "onpointerrawupdate" in window,
       getPredictedEvents: !!(window.PointerEvent && window.PointerEvent.prototype.getPredictedEvents),
       TouchEvent: "ontouchstart" in window,
       touchActionCss: !!(window.CSS && CSS.supports && CSS.supports("touch-action", "none")),
