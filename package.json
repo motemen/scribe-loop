@@ -1,20 +1,31 @@
 {
-  "name": "scribe-loop",
+  "name": "@motemen/scribe-loop",
   "version": "0.1.0",
-  "private": true,
-  "type": "module",
   "description": "Kindle Scribe の標準ブラウザで、AI エージェントの資料を読み、手書きで返すための環境",
+  "type": "module",
+  "bin": {
+    "scribe-loop": "bin/scribe-loop.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "public/"
+  ],
   "engines": {
     "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/motemen/scribe-loop.git"
   },
   "scripts": {
     "start": "node bin/scribe-loop.mjs serve",
     "test": "node --test test/"
   },
-  "bin": {
-    "scribe-loop": "bin/scribe-loop.mjs"
-  },
   "optionalDependencies": {
     "playwright-core": "^1.65.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -37,10 +37,9 @@ Node.js 20 以上で動きます。サーバー自体は外部のパッケージ
 
 サーバーを先に起動しておく必要はありません。`scribe-loop` のコマンド（`push` や `mcp` など）は、サーバーが応答しなければ、自分と同じフラグを付けてサーバーを裏で起動し、それから処理を続けます。
 
-```sh
-npm install                 # 任意: 合成画像を作るための playwright-core
-npm link                    # scribe-loop コマンドを使えるようにする（任意）
+`npx` で実行できます。以下の例の `scribe-loop` は、`npx @motemen/scribe-loop` と読み替えてください（`npm install -g @motemen/scribe-loop` で入れれば、そのまま `scribe-loop` で使えます）。
 
+```sh
 scribe-loop start           # 裏で起動する（ほかのコマンドでも自動で起動する）
 scribe-loop status          # 状態、Kindle で開く URL、データとログの場所
 scribe-loop stop
@@ -67,7 +66,7 @@ Kindle Scribe のブラウザでは、`scribe-loop status` が表示する URL�
 
 ログは `$XDG_STATE_HOME/scribe-loop/server.log` に書きます。
 
-資料と手書きを重ねた画像は、`playwright-core`（`npm install` で入る任意の依存）と Chrome / Chromium があるときだけ作ります。ないときは、手書きの線だけの SVG と、線の下にある文字をエージェントに渡します。
+資料と手書きを重ねた画像は、`playwright-core`（任意の依存で、ふつうは一緒に入る）と Chrome / Chromium があるときだけ作ります。ないときは、手書きの線だけの SVG と、線の下にある文字をエージェントに渡します。
 
 ## エージェントから使う
 
@@ -78,7 +77,7 @@ MCP サーバー（stdio）と CLI があります。どちらも、フラグで
 Claude Code では、次のように登録します。フラグを付けるときは `mcp` の後ろに続けます（例: `mcp --port 8480`）。
 
 ```sh
-claude mcp add -s user scribe-loop -- node /path/to/scribe-loop/bin/scribe-loop.mjs mcp
+claude mcp add -s user scribe-loop -- npx -y @motemen/scribe-loop mcp
 ```
 
 | ツール | 内容 |
@@ -119,5 +118,8 @@ scribe-loop wait [--pending] [--timeout 秒]   # 新しいフィードバック�
 ## 開発
 
 ```sh
+npm install
 npm test
 ```
+
+手元のチェックアウトをそのまま使うときは、`npx @motemen/scribe-loop` の代わりに `npx /path/to/scribe-loop`（または `node /path/to/scribe-loop/bin/scribe-loop.mjs`）を使います。公開するパッケージと同じものを試すときは、`npm pack` で作った tarball を `npx ./motemen-scribe-loop-0.1.0.tgz` で実行します。
