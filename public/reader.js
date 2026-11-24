@@ -78,7 +78,7 @@
   function setStatus() {
     var parts = [];
     if (readOnly) parts.push("版 " + REV + "（読むだけ）");
-    else parts.push(tool === "pen" ? "ペン" : "消しゴム");
+    else parts.push(tool === "pen" ? "ペン" : tool === "eraser" ? "消しゴム" : "指");
     parts.push((page + 1) + "/" + pageCount() + "頁");
     if (outbox.length) parts.push("未保存 " + outbox.length);
     if (sendState) parts.push(sendState);
@@ -133,12 +133,27 @@
       ctx = ink.getContext("2d");
       redraw();
     }
-    goPage(Math.min(page, pageCount() - 1));
+    var keep = viewport.scrollTop;
+    viewport.scrollTop = keep;
+    syncPage();
+    setStatus();
+  }
+
+  // 指モードで途中までスクロールできるので、ページは表示位置から求める
+  function syncPage() {
+    page = Math.max(0, Math.min(pageCount() - 1, Math.floor(viewport.scrollTop / Math.max(1, pageHeight) + 0.5)));
   }
 
   function goPage(n) {
     page = Math.max(0, Math.min(pageCount() - 1, n));
     viewport.scrollTop = page * pageHeight;
+    setStatus();
+  }
+
+  // 今の位置から 1 画面ぶん動かす
+  function scrollScreens(n) {
+    viewport.scrollTop = Math.max(0, viewport.scrollTop + n * pageHeight);
+    syncPage();
     setStatus();
   }
 
@@ -325,7 +340,15 @@
   }
 
   function onDown(e) {
-    if (readOnly) return;
+    if (gesture && gesture.pointerId !== e.pointerId) return stop(e);
+    if (readOnly || tool === "hand") {
+      // 指モード（古い版を読むときも）: なぞった方向にスクロールする
+      if (ink.setPointerCapture && e.pointerId !== undefined) {
+        try { ink.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+      gesture = { kind: "pan", pointerId: e.pointerId, y: e.clientY, top: viewport.scrollTop };
+      return stop(e);
+    }
     if (gesture && gesture.pointerId !== e.pointerId) return stop(e); // 書いている最中の別の接触（手のひらなど）
     if (current) finishStroke(null);
     if (ink.setPointerCapture && e.pointerId !== undefined) {
@@ -347,6 +370,10 @@
   function onMove(e) {
     if (!gesture) return;
     if (gesture.pointerId !== undefined && e.pointerId !== undefined && gesture.pointerId !== e.pointerId) return stop(e);
+    if (gesture.kind === "pan") {
+      viewport.scrollTop = Math.max(0, gesture.top - (e.clientY - gesture.y));
+      return stop(e);
+    }
     if (gesture.kind === "erase") {
       eraseAt(pointFrom(e));
       return stop(e);
@@ -374,6 +401,11 @@
     if (gesture.pointerId !== undefined && e.pointerId !== undefined && gesture.pointerId !== e.pointerId) return stop(e);
     var g = gesture;
     gesture = null;
+    if (g.kind === "pan") {
+      syncPage();
+      setStatus();
+      return stop(e);
+    }
     if (g.kind === "erase") {
       if (erasedIds.length) queueOp({ kind: "del", ids: erasedIds });
       erasedIds = [];
@@ -581,6 +613,7 @@
     tool = next;
     document.getElementById("penBtn").className = tool === "pen" ? "active" : "";
     document.getElementById("eraserBtn").className = tool === "eraser" ? "active" : "";
+    document.getElementById("handBtn").className = tool === "hand" ? "active" : "";
     setStatus();
   }
 
@@ -588,8 +621,9 @@
   SL.tap(document.getElementById("penBtn"), function () { setTool("pen"); });
   SL.tap(document.getElementById("eraserBtn"), function () { setTool("eraser"); });
   SL.tap(document.getElementById("undoBtn"), undo);
-  SL.tap(document.getElementById("prevBtn"), function () { goPage(page - 1); });
-  SL.tap(document.getElementById("nextBtn"), function () { goPage(page + 1); });
+  SL.tap(document.getElementById("handBtn"), function () { setTool("hand"); });
+  SL.tap(document.getElementById("prevBtn"), function () { scrollScreens(-1); });
+  SL.tap(document.getElementById("nextBtn"), function () { scrollScreens(1); });
   SL.tap(sendBtn, send);
   SL.tap(reviseBtn, function () {
     if (readOnly) return;
@@ -664,7 +698,7 @@
     if (readOnly) REV = VIEW_REV;
     LOCAL_KEY = "sl.ink." + DOC + ".r" + REV;
     if (readOnly) {
-      var hide = ["penBtn", "eraserBtn", "undoBtn", "sendBtn", "reviseBtn"];
+      var hide = ["penBtn", "eraserBtn", "handBtn", "undoBtn", "sendBtn", "reviseBtn"];
       for (var i = 0; i < hide.length; i += 1) document.getElementById(hide[i]).style.display = "none";
       latestBtn.style.display = "";
     }
