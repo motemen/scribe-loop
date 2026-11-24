@@ -4,6 +4,7 @@
 //   scribe-loop serve                        サーバーを起動する
 //   scribe-loop mcp                          MCP サーバー（stdio）を起動する
 //   scribe-loop push <file.html> [--title T] [--reply-to <feedback-id>]
+//   scribe-loop revise <document-id> <file.html> [--feedback <feedback-id>]
 //   scribe-loop docs                         資料の一覧
 //   scribe-loop feedback [--all|--status S]  フィードバックの一覧（既定は未処理）
 //   scribe-loop show <feedback-id> [--out <dir>]
@@ -47,6 +48,14 @@ async function main() {
       console.log(`${meta.id}\t${meta.title}\t${meta.url}`);
       return;
     }
+    case "revise": {
+      const { values, positionals } = parseArgs({ args: rest, allowPositionals: true, options: { feedback: { type: "string" }, title: { type: "string" } } });
+      if (positionals.length !== 2) usage();
+      const html = fs.readFileSync(positionals[1] === "-" ? 0 : positionals[1], "utf8");
+      const meta = await client.reviseDocument(positionals[0], { html, title: values.title, feedbackId: values.feedback });
+      console.log(`${meta.id}\trev=${meta.revision}\t${meta.title}\t${meta.url}`);
+      return;
+    }
     case "docs": {
       for (const d of await client.listDocuments()) {
         const fb = d.feedback.length ? d.feedback[d.feedback.length - 1].status : "-";
@@ -58,7 +67,7 @@ async function main() {
       const { values } = parseArgs({ args: rest, options: { all: { type: "boolean" }, status: { type: "string" } } });
       const status = values.all ? undefined : values.status || "pending";
       for (const f of await client.listFeedback(status)) {
-        console.log([f.id, f.status, f.createdAt, `strokes=${f.strokes}`, `new=${f.newStrokes}`, f.documentTitle].join("\t"));
+        console.log([f.id, f.status, f.mode, f.createdAt, `strokes=${f.strokes}`, `new=${f.newStrokes}`, f.documentTitle].join("\t"));
       }
       return;
     }
@@ -66,7 +75,7 @@ async function main() {
       const { values, positionals } = parseArgs({ args: rest, allowPositionals: true, options: { out: { type: "string" } } });
       if (positionals.length !== 1) usage();
       const fb = await client.getFeedback(positionals[0]);
-      const source = await client.source(fb.documentId);
+      const source = await client.source(fb.documentId, fb.revision);
       if (!values.out) {
         console.log(describeFeedback(fb, source));
         return;

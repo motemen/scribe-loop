@@ -40,6 +40,7 @@ button[disabled] { border-style: dashed; color: #777; }
 #toolbar { padding: 6px 8px 2px; border-bottom: 2px solid #000; }
 #toolbar .row { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: start; -webkit-align-items: flex-start; align-items: flex-start; }
 #toolbar .tools { -webkit-box-flex: 1; -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; }
+#reviseBtn { -webkit-flex: 0 0 auto; flex: 0 0 auto; margin: 0 0 4px 12px; }
 #sendBtn {
   -webkit-flex: 0 0 auto;
   flex: 0 0 auto;

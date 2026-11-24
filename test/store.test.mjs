@@ -60,3 +60,25 @@ test("data survives a restart", () => {
   assert.deepEqual(b.appendOps(doc.id, [{ opId: "a", kind: "add", stroke: stroke("s1") }]), ["a"]);
   assert.equal(b.strokes(doc.id).length, 1);
 });
+
+test("revising keeps the old revision and its ink, and starts the new one blank", () => {
+  const store = tmpStore();
+  const doc = store.createDocument({ title: "x", html: "<p>v1</p>" });
+  store.setReviseOnSend(doc.id, true);
+  store.appendOps(doc.id, [{ opId: "a", kind: "add", stroke: stroke("s1"), revision: 1 }]);
+  const fb = store.createFeedback(doc.id, { clientRequestId: "r", strokeIds: ["s1"], revision: 1 }).feedback;
+  assert.equal(fb.mode, "revise");
+  const meta = store.reviseDocument(doc.id, { html: "<p>v2</p>", feedbackId: fb.id });
+  assert.equal(meta.revision, 2);
+  assert.equal(store.findFeedback(fb.id).status, "done");
+  assert.equal(store.source(doc.id), "<p>v2</p>");
+  assert.equal(store.source(doc.id, 1), "<p>v1</p>");
+  assert.equal(store.strokes(doc.id).length, 0);
+  assert.equal(store.strokes(doc.id, 1).length, 1);
+  // 書き換えの前に端末で書かれ、あとから届いた操作は古い版に入る
+  store.appendOps(doc.id, [{ opId: "b", kind: "add", stroke: stroke("s2"), revision: 1 }]);
+  assert.equal(store.strokes(doc.id, 1).length, 2);
+  assert.equal(store.strokes(doc.id).length, 0);
+  // 古い版を見たまま送ったものは受け付けない
+  assert.equal(store.createFeedback(doc.id, { clientRequestId: "r2", strokeIds: [], revision: 1 }).stale, 2);
+});

@@ -23,6 +23,21 @@ const TOOLS = [
     },
   },
   {
+    name: "scribe_revise_document",
+    description:
+      "登録済みの資料を、新しい版に書き換える（Kindle では同じ資料のまま新しい版に切り替わる）。前の版と、その版への書き込みは残る。新しい版は書き込みなしで始まる。フィードバックを受けて書き換えるときは feedback_id を渡す（そのフィードバックは処理済みになる）。人がセッションで「書き換えて」と頼んだとき、またはフィードバックの希望が書き換えのときに使う。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        document_id: { type: "string" },
+        html: { type: "string", description: "新しい版の HTML（全体）" },
+        title: { type: "string", description: "題名を変えるときだけ" },
+        feedback_id: { type: "string", description: "反映したフィードバックの ID（任意）" },
+      },
+      required: ["document_id", "html"],
+    },
+  },
+  {
     name: "scribe_list_feedback",
     description: "人が Kindle Scribe から送ったフィードバックの一覧。既定では未処理（pending）だけを返す。",
     inputSchema: {
@@ -70,6 +85,10 @@ async function callTool(client, name, args) {
       const meta = await client.pushDocument({ title: args.title, html: args.html, inReplyTo: args.in_reply_to });
       return [text(`登録しました: ${meta.title}（${meta.id}）\nKindle Scribe の一覧に出ます。${meta.url}`)];
     }
+    case "scribe_revise_document": {
+      const meta = await client.reviseDocument(args.document_id, { html: args.html, title: args.title, feedbackId: args.feedback_id });
+      return [text(`書き換えました: ${meta.title}（${meta.id}）の版 ${meta.revision}。Kindle で開いている場合は「新しい版」から切り替えられます。${meta.url}`)];
+    }
     case "scribe_list_feedback": {
       const status = args.status === "all" ? undefined : args.status || "pending";
       const list = await client.listFeedback(status);
@@ -77,7 +96,7 @@ async function callTool(client, name, args) {
     }
     case "scribe_get_feedback": {
       const fb = await client.getFeedback(args.feedback_id);
-      const source = await client.source(fb.documentId);
+      const source = await client.source(fb.documentId, fb.revision);
       if (fb.status === "pending") await client.updateFeedback(fb.id, { status: "processing" });
       const content = [text(describeFeedback(fb, source))];
       let pages = { available: false, pages: [] };
@@ -136,9 +155,13 @@ async function watchFeedback(client, notify) {
     try {
       const { feedback } = await client.waitFeedback(after, 60);
       for (const f of feedback) {
+        const revise = f.mode === "revise";
         notify(
-          `Kindle Scribe で「${f.documentTitle}」への書き込みが送られました（フィードバック ${f.id}、線 ${f.newStrokes} 本）。scribe_get_feedback で読んでください。`,
-          { kind: "feedback", feedback_id: f.id, document_id: f.documentId },
+          `Kindle Scribe で「${f.documentTitle}」への書き込みが送られました（フィードバック ${f.id}、線 ${f.newStrokes} 本）。` +
+            (revise
+              ? "資料は書き換えモードです。scribe_get_feedback で読み、書き込みを反映して scribe_revise_document でこの資料を書き換えてください。"
+              : "scribe_get_feedback で読んでください。"),
+          { kind: "feedback", mode: revise ? "revise" : "respond", feedback_id: f.id, document_id: f.documentId },
         );
         if (f.createdAt > after) after = f.createdAt;
       }

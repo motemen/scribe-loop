@@ -69,6 +69,8 @@
       }
       var fb = d.feedback && d.feedback.length ? d.feedback[d.feedback.length - 1] : null;
       if (fb) badge(meta, STATUS[fb.status] || fb.status, fb.status !== "done");
+      if (d.revision > 1) badge(meta, "版 " + d.revision, false);
+      if (d.reviseOnSend) badge(meta, "書き換え", false);
       if (d.strokes) badge(meta, "書き込み " + d.strokes, false);
       meta.appendChild(document.createTextNode(SL.formatTime(d.createdAt)));
       li.appendChild(meta);

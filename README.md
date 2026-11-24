@@ -25,7 +25,9 @@ Kindle Scribe の画面:
 - **ペン / 消しゴム**: 指でもペンでも線になる（初代 Scribe のブラウザはペンと指を区別できない）。書いている最中に手のひらが触れても無視する。
 - **戻す**: 自分が最後に書いた線を消す。
 - **前 / 次**: ページを送る。資料の後ろに白紙が 1 ページ付く。
-- **送る**: その時点の書き込みをエージェントに送る。オフラインなら、つながってから送る。
+- **送る**（右上）: その時点の書き込みをエージェントに送る。オフラインなら、つながってから送る。
+- **☐ 書き換え**: チェックを入れて送ると、エージェントは会話で応答する代わりに、書き込みを反映してこの資料を書き換える。セッションで「書き換えて」と頼んでもよい。
+- **新しい版 / 前の版**: 資料が書き換えられると「新しい版」が出る。新しい版は書き込みなしで始まり、前の版と書き込みは「前の版」で見返せる。
 
 ## サーバー
 
@@ -85,6 +87,7 @@ claude mcp add scribe-loop -e SCRIBE_LOOP_URL=http://<サーバー>:8470 -- node
 | ツール | 内容 |
 | --- | --- |
 | `scribe_push_document` | 資料（HTML）を登録する。`in_reply_to` にフィードバックの ID を渡すと、その返信になる |
+| `scribe_revise_document` | 資料を新しい版に書き換える。前の版と書き込みは残る |
 | `scribe_list_feedback` | 未処理のフィードバックの一覧 |
 | `scribe_get_feedback` | フィードバックの中身（元の資料、線ごとの位置と下の文字、合成画像） |
 | `scribe_update_feedback` | フィードバックの状態を変える |
@@ -106,6 +109,7 @@ claude --dangerously-load-development-channels server:scribe-loop
 
 ```sh
 scribe-loop push doc.html [--title 題名] [--reply-to <フィードバックの ID>]
+scribe-loop revise <資料の ID> doc.html [--feedback <フィードバックの ID>]
 scribe-loop docs
 scribe-loop feedback [--all]
 scribe-loop show <フィードバックの ID> [--out <ディレクトリ>]   # --out で画像なども書き出す

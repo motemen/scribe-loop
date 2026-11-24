@@ -101,7 +101,7 @@ export function createHandler(store, { publicUrl } = {}) {
     }
     if (method === "GET" && parts[0] === "d" && parts[2] === "frame" && parts.length === 3) {
       const id = requireDoc(parts[1]);
-      return send(res, 200, wrapDocument(store.source(id)), "text/html; charset=utf-8", {
+      return send(res, 200, wrapDocument(store.source(id, url.searchParams.get("rev"))), "text/html; charset=utf-8", {
         "content-security-policy": FRAME_CSP,
         "cache-control": "no-cache",
       });
@@ -133,12 +133,22 @@ export function createHandler(store, { publicUrl } = {}) {
       }
       requireDoc(id);
       if (!sub && method === "GET") return send(res, 200, { ...store.summary(id), url: documentUrl(id) });
-      if (sub === "source" && method === "GET") return send(res, 200, store.source(id), "text/html; charset=utf-8");
+      if (sub === "source" && method === "GET") return send(res, 200, store.source(id, url.searchParams.get("rev")), "text/html; charset=utf-8");
+      if (sub === "settings" && method === "POST") {
+        const body = await readBody(req, 16 * 1024);
+        const meta = store.setReviseOnSend(id, body.reviseOnSend);
+        return send(res, 200, { reviseOnSend: meta.reviseOnSend });
+      }
+      if (sub === "revisions" && method === "POST") {
+        const body = await readBody(req, 20 * 1024 * 1024);
+        const meta = store.reviseDocument(id, { html: body.html, title: body.title, feedbackId: body.feedbackId || null });
+        return send(res, 200, { ...meta, url: documentUrl(id) });
+      }
       if (sub === "read" && method === "POST") {
         store.markRead(id);
         return send(res, 200, { ok: true });
       }
-      if (sub === "ink" && method === "GET") return send(res, 200, { strokes: store.strokes(id) });
+      if (sub === "ink" && method === "GET") return send(res, 200, { strokes: store.strokes(id, url.searchParams.get("rev")) });
       if (sub === "ink" && method === "POST") {
         const body = await readBody(req, 8 * 1024 * 1024);
         const acked = store.appendOps(id, Array.isArray(body.ops) ? body.ops : [], body.client);
@@ -151,7 +161,9 @@ export function createHandler(store, { publicUrl } = {}) {
           strokeIds: Array.isArray(body.strokeIds) ? body.strokeIds.map(String) : [],
           surface: body.surface && typeof body.surface === "object" ? body.surface : null,
           client: body.client,
+          revision: Number(body.revision) || null,
         });
+        if (result.stale) return send(res, 409, { error: "document was revised", revision: result.stale });
         if (result.missing) return send(res, 409, { error: "strokes not received yet", missing: result.missing });
         const fb = result.feedback;
         notifyWaiters();
@@ -207,7 +219,7 @@ export function createHandler(store, { publicUrl } = {}) {
       }
       if (sub === "pages" && method === "GET") {
         const outDir = store.feedbackDir(fb.id);
-        const pages = await renderPages({ html: store.source(fb.documentId), strokes: fb.strokes, surface: fb.surface, outDir });
+        const pages = await renderPages({ html: store.source(fb.documentId, fb.revision), strokes: fb.strokes, surface: fb.surface, outDir });
         if (!subId) return send(res, 200, { available: !!pages, pages: pages || [] });
         const entry = (pages || []).find((p) => p.file === subId);
         if (!entry) throw httpError(404, "page not found");

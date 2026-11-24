@@ -9,6 +9,10 @@
   "use strict";
 
   var DOC = decodeURIComponent(location.pathname.split("/")[2] || "");
+  // ?rev=n なら古い版を読むだけで開く
+  var VIEW_REV = Number((/[?&]rev=(\d+)/.exec(location.search) || [])[1] || 0);
+  var REV = 0; // 開いている版（資料の情報を読んでから決まる）
+  var readOnly = false;
   var BASE_WIDTH = 2.5;
   var ERASE_RADIUS = 14;
 
@@ -21,9 +25,13 @@
   var statusEl = document.getElementById("status");
   var sendBtn = document.getElementById("sendBtn");
   var replyBtn = document.getElementById("replyBtn");
+  var reviseBtn = document.getElementById("reviseBtn");
+  var newRevBtn = document.getElementById("newRevBtn");
+  var prevRevBtn = document.getElementById("prevRevBtn");
+  var latestBtn = document.getElementById("latestBtn");
 
-  var LOCAL_KEY = "sl.ink." + DOC;
-  var OUTBOX_KEY = "sl.outbox." + DOC;
+  var LOCAL_KEY = ""; // 版ごと。版が決まってから設定する
+  var OUTBOX_KEY = "sl.outbox." + DOC; // 操作には版を書いておくので、資料ごとに一つ
   var FEEDBACK_KEY = "sl.feedback." + DOC;
 
   var strokes = [];
@@ -56,6 +64,7 @@
   }
 
   function saveLocal() {
+    if (readOnly || !LOCAL_KEY) return;
     SL.storage.set(LOCAL_KEY, JSON.stringify(strokes));
     SL.storage.set(OUTBOX_KEY, JSON.stringify(outbox));
     if (pendingFeedback) SL.storage.set(FEEDBACK_KEY, JSON.stringify(pendingFeedback));
@@ -68,12 +77,14 @@
 
   function setStatus() {
     var parts = [];
-    parts.push(tool === "pen" ? "ペン" : "消しゴム");
+    if (readOnly) parts.push("版 " + REV + "（読むだけ）");
+    else parts.push(tool === "pen" ? "ペン" : "消しゴム");
     parts.push((page + 1) + "/" + pageCount() + "頁");
     if (outbox.length) parts.push("未保存 " + outbox.length);
     if (sendState) parts.push(sendState);
-    else if (summary && summary.feedback && summary.feedback.length) {
-      parts.push("送信: " + (STATUS[summary.feedback[summary.feedback.length - 1].status] || ""));
+    else if (!readOnly && summary && summary.feedback && summary.feedback.length) {
+      var last = summary.feedback[summary.feedback.length - 1];
+      if ((last.revision || 1) === REV) parts.push("送信: " + (STATUS[last.status] || ""));
     }
     SL.text(statusEl, parts.join(" / "));
   }
@@ -314,6 +325,7 @@
   }
 
   function onDown(e) {
+    if (readOnly) return;
     if (gesture && gesture.pointerId !== e.pointerId) return stop(e); // 書いている最中の別の接触（手のひらなど）
     if (current) finishStroke(null);
     if (ink.setPointerCapture && e.pointerId !== undefined) {
@@ -420,6 +432,7 @@
   function queueOp(op) {
     op.opId = SL.randomId("op");
     op.at = SL.now();
+    op.revision = REV;
     outbox.push(op);
     saveLocal();
     flush();
@@ -462,6 +475,15 @@
       sending = true;
       SL.post("/api/documents/" + encodeURIComponent(DOC) + "/feedback", pendingFeedback, function (err, data) {
         sending = false;
+        if (err && data && data.error === "document was revised") {
+          // 送る前に資料が書き換えられていた
+          pendingFeedback = null;
+          saveLocal();
+          sendState = "送れませんでした（新しい版があります）";
+          setStatus();
+          loadSummary();
+          return;
+        }
         if (err) {
           sendState = "送信待ち（つながったら送ります）";
           setStatus();
@@ -500,11 +522,13 @@
   }
 
   function send() {
+    if (readOnly) return;
     var ids = [];
     for (var i = 0; i < strokes.length; i += 1) ids.push(strokes[i].id);
     pendingFeedback = {
       clientRequestId: SL.randomId("fr"),
       client: SL.clientId,
+      revision: REV,
       strokeIds: ids,
       surface: { width: ink.clientWidth || ink.offsetWidth, pageHeight: pageHeight, contentHeight: contentHeight, devicePixelRatio: window.devicePixelRatio || 1, userAgent: navigator.userAgent, layout: captureLayout() }
     };
@@ -535,8 +559,12 @@
     SL.get("/api/documents/" + encodeURIComponent(DOC), function (err, data) {
       if (err || !data) return;
       summary = data;
-      SL.text(titleEl, data.title);
+      var rev = data.revision || 1;
+      SL.text(titleEl, data.title + (rev > 1 || readOnly ? "（版 " + (REV || rev) + (readOnly ? " / 最新 " + rev : "") + "）" : ""));
       document.title = data.title;
+      reviseBtn.firstChild.nodeValue = data.reviseOnSend ? "☑ 書き換え" : "☐ 書き換え";
+      reviseBtn.className = data.reviseOnSend ? "active" : "";
+      if (REV && !readOnly && rev > REV) newRevBtn.style.display = "";
       var reply = data.replies && data.replies.length ? data.replies[data.replies.length - 1] : null;
       if (reply) {
         replyBtn.style.display = "";
@@ -563,6 +591,23 @@
   SL.tap(document.getElementById("prevBtn"), function () { goPage(page - 1); });
   SL.tap(document.getElementById("nextBtn"), function () { goPage(page + 1); });
   SL.tap(sendBtn, send);
+  SL.tap(reviseBtn, function () {
+    if (readOnly) return;
+    var next = !(summary && summary.reviseOnSend);
+    reviseBtn.firstChild.nodeValue = next ? "☑ 書き換え" : "☐ 書き換え";
+    reviseBtn.className = next ? "active" : "";
+    SL.post("/api/documents/" + encodeURIComponent(DOC) + "/settings", { reviseOnSend: next }, function (err, data) {
+      if (!err && data && summary) summary.reviseOnSend = data.reviseOnSend;
+      loadSummary();
+    });
+  });
+  SL.tap(newRevBtn, function () {
+    // 書きかけの操作を送り切ってから、新しい版を開く
+    flush();
+    window.setTimeout(function () { location.href = "/d/" + encodeURIComponent(DOC); }, outbox.length ? 1500 : 0);
+  });
+  SL.tap(prevRevBtn, function () { location.href = "/d/" + encodeURIComponent(DOC) + "?rev=" + (REV - 1); });
+  SL.tap(latestBtn, function () { location.href = "/d/" + encodeURIComponent(DOC); });
   SL.tap(replyBtn, function () {
     var id = replyBtn.getAttribute("data-id");
     if (id) location.href = "/d/" + encodeURIComponent(id);
@@ -571,16 +616,26 @@
   // ---- 起動 ----
 
   function restore(done) {
-    var local = readJson(LOCAL_KEY, null);
     outbox = readJson(OUTBOX_KEY, []);
+    if (readOnly) {
+      // 古い版: サーバーにある書き込みを表示するだけ
+      SL.get("/api/documents/" + encodeURIComponent(DOC) + "/ink?rev=" + REV, function (err, data) {
+        if (!err && data && data.strokes) strokes = data.strokes;
+        done();
+      });
+      return;
+    }
     pendingFeedback = readJson(FEEDBACK_KEY, null);
+    var local = readJson(LOCAL_KEY, null);
+    // 版を持つ前の保存（版 1 だけ）を引き継ぐ
+    if (!local && REV === 1) local = readJson("sl.ink." + DOC, null);
     if (local) {
       strokes = local;
       done();
       return;
     }
     // 端末に何もなければ、サーバーにあるものを使う
-    SL.get("/api/documents/" + encodeURIComponent(DOC) + "/ink", function (err, data) {
+    SL.get("/api/documents/" + encodeURIComponent(DOC) + "/ink?rev=" + REV, function (err, data) {
       if (!err && data && data.strokes) strokes = data.strokes;
       saveLocal();
       done();
@@ -602,11 +657,36 @@
     window.setTimeout(layout, 3000);
   }
 
-  SL.on(frame, "load", start);
-  frame.src = "/d/" + encodeURIComponent(DOC) + "/frame";
-  window.setTimeout(start, 5000); // load が来ないときのため
-  SL.post("/api/documents/" + encodeURIComponent(DOC) + "/read", {}, null);
-  loadSummary();
+  // 資料の情報を読んで開く版を決めてから、資料と書き込みを読み込む
+  function open(rev) {
+    REV = rev;
+    readOnly = VIEW_REV > 0 && VIEW_REV < rev;
+    if (readOnly) REV = VIEW_REV;
+    LOCAL_KEY = "sl.ink." + DOC + ".r" + REV;
+    if (readOnly) {
+      var hide = ["penBtn", "eraserBtn", "undoBtn", "sendBtn", "reviseBtn"];
+      for (var i = 0; i < hide.length; i += 1) document.getElementById(hide[i]).style.display = "none";
+      latestBtn.style.display = "";
+    }
+    if (REV > 1) prevRevBtn.style.display = "";
+    SL.on(frame, "load", start);
+    frame.src = "/d/" + encodeURIComponent(DOC) + "/frame?rev=" + REV;
+    window.setTimeout(start, 5000); // load が来ないときのため
+    if (!readOnly) SL.post("/api/documents/" + encodeURIComponent(DOC) + "/read", {}, null);
+  }
+
+  function boot() {
+    SL.get("/api/documents/" + encodeURIComponent(DOC), function (err, data) {
+      if (err || !data) {
+        SL.text(statusEl, "サーバーに届きません。再読み込みしてください。");
+        window.setTimeout(boot, 5000);
+        return;
+      }
+      open(data.revision || 1);
+      loadSummary();
+    });
+  }
+  boot();
 
   var resizeTimer = null;
   SL.on(window, "resize", function () {
