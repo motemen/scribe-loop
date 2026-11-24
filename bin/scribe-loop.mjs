@@ -13,6 +13,7 @@
 //   scribe-loop feedback [--all|--status S]  フィードバックの一覧（既定は未処理）
 //   scribe-loop show <feedback-id> [--out <dir>]
 //   scribe-loop done <feedback-id> [--note N]
+//   scribe-loop wait [--pending] [--timeout 秒]  新しいフィードバックが届くまで待つ（届いたら ID を出して終わる）
 //
 // どのコマンドにも付けられるフラグ:
 //   --host <addr>        待ち受けるアドレス（既定 0.0.0.0）
@@ -57,6 +58,8 @@ try {
       out: { type: "string" },
       note: { type: "string" },
       "no-channel": { type: "boolean" },
+      pending: { type: "boolean" },
+      timeout: { type: "string" },
     },
   }));
 } catch (err) {
@@ -167,6 +170,30 @@ async function main() {
       if (fb.status === "pending") await client.updateFeedback(fb.id, { status: "processing" });
       console.log(values.out);
       for (const name of fs.readdirSync(values.out).sort()) console.log(`  ${name}`);
+      return;
+    }
+    case "wait": {
+      // channels が使えないセッションで、人が「送る」を押すのを待つ。
+      // 届いたフィードバックを出力して終わる（--timeout 秒を過ぎたら終了コード 1）。
+      const deadline = values.timeout ? Date.now() + Number(values.timeout) * 1000 : Infinity;
+      const print = (list) => {
+        for (const f of list) {
+          console.log([f.id, f.mode, f.documentTitle].join("\t"));
+        }
+        console.log(`scribe_get_feedback（または scribe-loop show <ID>）で読んでください。`);
+      };
+      if (values.pending) {
+        const pending = await client.listFeedback("pending");
+        if (pending.length) return print(pending);
+      }
+      let after = new Date().toISOString();
+      while (Date.now() < deadline) {
+        const left = Math.ceil((deadline - Date.now()) / 1000);
+        const { feedback } = await client.waitFeedback(after, Math.max(1, Math.min(60, left)));
+        if (feedback.length) return print(feedback);
+      }
+      console.error("scribe-loop: 待ち時間を過ぎました");
+      process.exitCode = 1;
       return;
     }
     case "done": {

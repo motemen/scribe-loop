@@ -102,6 +102,8 @@ claude --dangerously-load-development-channels server:scribe-loop
 - イベントが届くのは、そのセッションを開いているあいだだけです。セッションが作業中なら、届いたイベントはその作業が終わってからまとめて読まれます。
 - 知らせる必要がなければ、MCP サーバーに `--no-channel` を付けます。
 
+channels を使えないセッション（有効にせずに起動した、組織のポリシーで止められている、など）では、エージェントが `scribe-loop wait` をバックグラウンドで実行して待ちます。このコマンドは新しいフィードバックが届くと ID を出力して終わるので、Claude Code はその時点でエージェントに続きを促します。MCP サーバーはエージェントへの説明にこのコマンドの実行方法を含めているので、人が指示する必要はありません。
+
 ### CLI
 
 ```sh
@@ -111,6 +113,7 @@ scribe-loop docs
 scribe-loop feedback [--all]
 scribe-loop show <フィードバックの ID> [--out <ディレクトリ>]   # --out で画像なども書き出す
 scribe-loop done <フィードバックの ID>
+scribe-loop wait [--pending] [--timeout 秒]   # 新しいフィードバックが届くまで待つ
 ```
 
 ## 開発

@@ -1,7 +1,27 @@
 // stdio の MCP サーバー（JSON-RPC 2.0、1 行に 1 メッセージ）。SDK に依存しない最小限の実装。
 
 import readline from "node:readline";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client, describeFeedback, AGENT_GUIDE } from "./client.mjs";
+
+const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "scribe-loop.mjs");
+
+const quote = (s) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`);
+
+// 同じサーバーを使う `scribe-loop wait` のコマンドライン
+function waitCommand(cfg) {
+  const flags = cfg.autostart ? cfg.serveArgs : ["--url", cfg.serverUrl];
+  return [process.execPath, BIN, "wait", ...flags].map(quote).join(" ");
+}
+
+function waitInstructions(cfg) {
+  return `
+
+人が Kindle で「送る」を押すのを待つとき（資料を登録して読んでもらう、など）、このセッションに channel のイベント（<channel source="scribe-loop" ...>）が届かない場合は、次のコマンドをバックグラウンドで実行して待つ。新しいフィードバックが届くとコマンドが終わり、その ID を出力するので、scribe_get_feedback で読む。
+  ${waitCommand(cfg)}
+channel のイベントが届くセッションでは、このコマンドは要らない。`;
+}
 
 const PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const MAX_IMAGES = 6;
@@ -83,7 +103,12 @@ async function callTool(client, name, args) {
   switch (name) {
     case "scribe_push_document": {
       const meta = await client.pushDocument({ title: args.title, html: args.html, inReplyTo: args.in_reply_to });
-      return [text(`登録しました: ${meta.title}（${meta.id}）\nKindle Scribe の一覧に出ます。${meta.url}`)];
+      return [
+        text(
+          `登録しました: ${meta.title}（${meta.id}）\nKindle Scribe の一覧に出ます。${meta.url}\n` +
+            `人が書き込んで送るのを待つなら、channel のイベントが届かないセッションでは次をバックグラウンドで実行する: ${waitCommand(cfgRef)}`,
+        ),
+      ];
     }
     case "scribe_revise_document": {
       const meta = await client.reviseDocument(args.document_id, { html: args.html, title: args.title, feedbackId: args.feedback_id });
@@ -171,7 +196,10 @@ async function watchFeedback(client, notify) {
   }
 }
 
+let cfgRef = null;
+
 export function runMcp(cfg, { channel = true, ensure = null } = {}) {
+  cfgRef = cfg;
   // ツールの呼び出しでは、サーバーが止まっていれば起動する。
   // 待ち受け（watchFeedback）では起動しない（scribe-loop stop で止めたサーバーを勝手に起こさないため）
   const client = new Client(cfg.serverUrl, { ensure });
@@ -210,7 +238,7 @@ export function runMcp(cfg, { channel = true, ensure = null } = {}) {
           protocolVersion: PROTOCOL_VERSIONS.includes(requested) ? requested : PROTOCOL_VERSIONS[0],
           capabilities: channel ? { tools: {}, experimental: { "claude/channel": {} } } : { tools: {} },
           serverInfo: { name: "scribe-loop", version: "0.1.0" },
-          instructions: AGENT_GUIDE + (channel ? CHANNEL_INSTRUCTIONS : ""),
+          instructions: AGENT_GUIDE + (channel ? CHANNEL_INSTRUCTIONS : "") + waitInstructions(cfg),
         };
       } else if (method === "ping") {
         result = {};
