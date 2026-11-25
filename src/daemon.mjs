@@ -62,7 +62,7 @@ function spawnServer(cfg) {
 export async function ensureServer(cfg, { timeoutMs = 10000 } = {}) {
   const running = await probe(cfg.serverUrl, 500);
   if (running) return { status: running, started: false };
-  if (!cfg.autostart) throw new Error(`scribe-loop のサーバーに届きません: ${cfg.serverUrl}`);
+  if (!cfg.autostart) throw new Error(`cannot reach the scribe-loop server at ${cfg.serverUrl}`);
 
   const pid = spawnServer(cfg);
   const deadline = Date.now() + timeoutMs;
@@ -75,7 +75,7 @@ export async function ensureServer(cfg, { timeoutMs = 10000 } = {}) {
     if (deadSince && Date.now() - deadSince > 1000) break;
     await sleep(100);
   }
-  throw new Error(`サーバーを起動できませんでした（ポートが使われているかもしれません）。ログ: ${logFile(cfg)}`);
+  throw new Error(`could not start the server (the port may be in use); see ${logFile(cfg)}`);
 }
 
 export async function stopServer(cfg, { timeoutMs = 5000 } = {}) {
@@ -87,5 +87,5 @@ export async function stopServer(cfg, { timeoutMs = 5000 } = {}) {
     if (!(await probe(cfg.serverUrl, 300))) return status;
     await sleep(100);
   }
-  throw new Error(`サーバー（pid ${status.pid}）が止まりませんでした`);
+  throw new Error(`the server (pid ${status.pid}) did not stop`);
 }

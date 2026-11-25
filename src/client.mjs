@@ -17,7 +17,7 @@ export class Client {
     try {
       res = await fetch(this.baseUrl + path, init);
     } catch (err) {
-      if (!this.ensure) throw new Error(`scribe-loop のサーバーに届きません: ${this.baseUrl}（${err.cause?.code || err.message}）`);
+      if (!this.ensure) throw new Error(`cannot reach the scribe-loop server at ${this.baseUrl} (${err.cause?.code || err.message})`);
       await this.ensure();
       res = await fetch(this.baseUrl + path, init);
     }

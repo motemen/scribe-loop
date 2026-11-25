@@ -1,29 +1,33 @@
 #!/usr/bin/env node
-// scribe-loop のコマンド。
-//
-//   scribe-loop start                        サーバーを裏で起動する（立っていなければ）
-//   scribe-loop status                       サーバーの状態
-//   scribe-loop stop                         サーバーを止める
-//   scribe-loop restart                      サーバーを起動し直す
-//   scribe-loop serve                        サーバーを手前で動かす（デバッグ用）
-//   scribe-loop mcp [--no-channel]           MCP サーバー（stdio）を起動する
+// Usage:
+//   scribe-loop start                        Start the server in the background (if it is not running)
+//   scribe-loop status                       Show the server status
+//   scribe-loop stop                         Stop the server
+//   scribe-loop restart                      Restart the server
+//   scribe-loop serve                        Run the server in the foreground (for debugging)
+//   scribe-loop mcp [--no-channel]           Run the MCP server (stdio)
 //   scribe-loop push <file.html> [--title T] [--reply-to <feedback-id>]
+//                                            Push a document ("-" reads from stdin)
 //   scribe-loop revise <document-id> <file.html> [--feedback <feedback-id>] [--title T]
-//   scribe-loop docs                         資料の一覧
-//   scribe-loop feedback [--all|--status S]  フィードバックの一覧（既定は未処理）
+//                                            Revise a document as a new revision
+//   scribe-loop docs                         List documents
+//   scribe-loop feedback [--all|--status S]  List feedback (pending by default)
 //   scribe-loop show <feedback-id> [--out <dir>]
+//                                            Show feedback (--out also writes the images)
 //   scribe-loop done <feedback-id> [--note N]
-//   scribe-loop wait [--pending] [--timeout 秒]  新しいフィードバックが届くまで待つ（届いたら ID を出して終わる）
+//                                            Mark feedback as done
+//   scribe-loop wait [--pending] [--timeout SECONDS]
+//                                            Wait for new feedback, print its ID and exit
 //
-// どのコマンドにも付けられるフラグ:
-//   --host <addr>        待ち受けるアドレス（既定 127.0.0.1。端末から開くには 0.0.0.0 など）
-//   --port <port>        待ち受けるポート（既定 8470）
-//   --data-dir <dir>     データの置き場所（既定 $XDG_DATA_HOME/scribe-loop）
-//   --public-url <url>   端末から見たサーバーの URL（既定は LAN 側の IP から推測）
-//   --chrome <path>      合成画像を作るときに使う Chrome / Chromium
-//   --url <url>          別のマシンで動いているサーバーを使う（このときは自分では起動しない）
+// Flags for every command:
+//   --host <addr>        Address to listen on (default 127.0.0.1; use 0.0.0.0 to open it from the device)
+//   --port <port>        Port to listen on (default 8470)
+//   --data-dir <dir>     Where data is stored (default $XDG_DATA_HOME/scribe-loop)
+//   --public-url <url>   The server URL as seen from the device (default: guessed from the LAN IP)
+//   --chrome <path>      Chrome / Chromium used to render page images
+//   --url <url>          Use a server running on another machine (no server is started)
 //
-// サーバーを使うコマンドは、サーバーが立っていなければ、同じフラグで裏で起動する。
+// Commands that use the server start it in the background with the same flags if it is not running.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -33,12 +37,14 @@ import { Client, describeFeedback } from "../src/client.mjs";
 import { ensureServer, stopServer, probe, logFile } from "../src/daemon.mjs";
 
 function usage() {
-  const text = fs
-    .readFileSync(new URL(import.meta.url), "utf8")
-    .split("\n")
-    .filter((l) => l.startsWith("//   "))
-    .map((l) => l.slice(3));
-  console.error("usage:\n" + text.join("\n"));
+  // このファイルの先頭のコメントをそのまま表示する
+  const lines = fs.readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1);
+  const text = [];
+  for (const l of lines) {
+    if (!l.startsWith("//")) break;
+    text.push(l.replace(/^\/\/ ?/, ""));
+  }
+  console.error(text.join("\n").trimEnd());
   process.exit(2);
 }
 
@@ -73,7 +79,7 @@ let hinted = false;
 // サーバーにつながらなかったときだけ、起動してからやり直す
 async function ensure() {
   const { status, started } = await ensureServer(cfg);
-  if (started) console.error(`scribe-loop: サーバーを起動しました ${status.publicUrl || cfg.serverUrl}（pid ${status.pid}）`);
+  if (started) console.error(`scribe-loop: started the server at ${status.publicUrl || cfg.serverUrl} (pid ${status.pid})`);
   if (started && deviceUnreachable(status)) {
     console.error(`scribe-loop: ${DEVICE_HINT}`);
     hinted = true;
@@ -109,7 +115,7 @@ async function main() {
     }
     case "stop": {
       const status = await stopServer(cfg);
-      console.error(status ? `scribe-loop: サーバー（pid ${status.pid}）を止めました` : "scribe-loop: サーバーは動いていません");
+      console.error(status ? `scribe-loop: stopped the server (pid ${status.pid})` : "scribe-loop: the server is not running");
       return;
     }
     case "restart": {
@@ -200,7 +206,7 @@ async function main() {
         const { feedback } = await client.waitFeedback(after, Math.max(1, Math.min(60, left)));
         if (feedback.length) return print(feedback);
       }
-      console.error("scribe-loop: 待ち時間を過ぎました");
+      console.error("scribe-loop: timed out");
       process.exitCode = 1;
       return;
     }
