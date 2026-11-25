@@ -28,6 +28,7 @@ Instead of asking in step 4, the session can be notified when you press Send (se
 
 The UI labels are in Japanese.
 
+- 削除 (delete), in the document list: press it twice to delete a document. Deleted documents are moved to `trash/` in the data directory with their handwriting and feedback.
 - ペン (pen) / 消しゴム (eraser): a finger also draws. The Kindle Scribe's browser reports the pen and fingers as the same kind of input, so they cannot be told apart. A palm that touches the screen while you are writing is ignored.
 - 指 (hand): dragging scrolls the page, with the pen or a finger. Switch back to the pen to write.
 - 戻す (undo): removes the last stroke you drew.

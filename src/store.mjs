@@ -5,6 +5,7 @@
 // <dataDir>/documents/<id>/ink.jsonl      書き込みの操作（追加・削除・全消去）
 // <dataDir>/documents/<id>/feedback/<fid>.json  フィードバック
 // <dataDir>/documents/<id>/source.r<n>.html, ink.r<n>.jsonl  書き換える前の版（n は版の番号）
+// <dataDir>/trash/<id>/                   削除した資料（ディレクトリごと移す。戻すときは documents/ に移して再起動）
 //
 // 1 プロセスから使う前提で、メモリにも持つ。
 
@@ -44,6 +45,7 @@ export function applyOps(ops) {
 export class Store {
   constructor(dataDir) {
     this.root = path.join(dataDir, "documents");
+    this.trash = path.join(dataDir, "trash");
     fs.mkdirSync(this.root, { recursive: true });
     this.docs = new Map(); // id -> { meta, ops, seen, feedback: Map }
     for (const id of fs.readdirSync(this.root)) {
@@ -218,6 +220,17 @@ export class Store {
       })),
       replies,
     };
+  }
+
+  // 資料をフィードバックごと trash に移す。返信の資料は残る（一覧では親のない資料として並ぶ）。
+  deleteDocument(id) {
+    if (!this.docs.has(id)) return false;
+    fs.mkdirSync(this.trash, { recursive: true });
+    let dest = path.join(this.trash, id);
+    if (fs.existsSync(dest)) dest = `${dest}-${Date.now()}`;
+    fs.renameSync(this.#dir(id), dest);
+    this.docs.delete(id);
+    return true;
   }
 
   listDocuments() {

@@ -6,6 +6,11 @@
   var listEl = document.getElementById("docs");
   var subEl = document.getElementById("sub");
   var lastJson = "";
+  var lastDocs = [];
+  // 削除は 2 回押す。1 回目で「本当に削除」に変わり、しばらく押されなければ戻る
+  var armedId = null;
+  var armTimer = null;
+  var armedAt = 0;
 
   var STATUS = { pending: "送信済み・未処理", processing: "AI が処理中", done: "処理済み" };
 
@@ -48,7 +53,45 @@
     return out;
   }
 
+  function disarm() {
+    armedId = null;
+    if (armTimer) window.clearTimeout(armTimer);
+    armTimer = null;
+  }
+
+  function deleteButton(d) {
+    var btn = document.createElement("button");
+    btn.className = "delete";
+    btn.appendChild(document.createTextNode(armedId === d.id ? "本当に削除" : "削除"));
+    if (armedId === d.id) btn.className = "delete active";
+    SL.tap(btn, function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      if (armedId !== d.id) {
+        disarm();
+        armedId = d.id;
+        armedAt = SL.now();
+        armTimer = window.setTimeout(function () {
+          disarm();
+          render(lastDocs);
+        }, 5000);
+        render(lastDocs);
+        return;
+      }
+      // 1 回目の押下から続けて届いた click で消えないように、少し間を置く
+      if (SL.now() - armedAt < 800) return;
+      disarm();
+      SL.text(btn, "削除中…");
+      SL.post("/api/documents/" + encodeURIComponent(d.id) + "/delete", {}, function (err) {
+        if (err) SL.text(subEl, "削除できませんでした。");
+        lastJson = "";
+        load();
+      });
+    });
+    return btn;
+  }
+
   function render(docs) {
+    lastDocs = docs;
     while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
     var unread = 0;
     var rows = order(docs);
@@ -60,6 +103,7 @@
       a.className = "title";
       a.href = "/d/" + encodeURIComponent(d.id);
       a.appendChild(document.createTextNode((rows[i].depth > 0 ? "↳ " : "") + d.title));
+      li.appendChild(deleteButton(d));
       li.appendChild(a);
       var meta = document.createElement("div");
       meta.className = "meta";

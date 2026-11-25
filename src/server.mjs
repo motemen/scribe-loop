@@ -163,6 +163,10 @@ export function createHandler(store, { publicUrl, cfg = {}, onShutdown = () => {
       }
       requireDoc(id);
       if (!sub && method === "GET") return send(res, 200, { ...store.summary(id), url: documentUrl(id) });
+      if ((!sub && method === "DELETE") || (sub === "delete" && method === "POST")) {
+        store.deleteDocument(id);
+        return send(res, 200, { ok: true });
+      }
       if (sub === "source" && method === "GET") return send(res, 200, store.source(id, url.searchParams.get("rev")), "text/html; charset=utf-8");
       if (sub === "settings" && method === "POST") {
         const body = await readBody(req, 16 * 1024);

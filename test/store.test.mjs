@@ -82,3 +82,17 @@ test("revising keeps the old revision and its ink, and starts the new one blank"
   // 古い版を見たまま送ったものは受け付けない
   assert.equal(store.createFeedback(doc.id, { clientRequestId: "r2", strokeIds: [], revision: 1 }).stale, 2);
 });
+
+test("deleting a document moves it to the trash with its feedback", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scribe-loop-test-"));
+  const store = new Store(dir);
+  const doc = store.createDocument({ html: "<h1>T</h1>" });
+  store.appendOps(doc.id, [{ opId: "a", kind: "add", stroke: stroke("s1") }]);
+  const { feedback } = store.createFeedback(doc.id, { strokeIds: ["s1"] });
+  assert.equal(store.deleteDocument(doc.id), true);
+  assert.equal(store.listDocuments().length, 0);
+  assert.equal(store.findFeedback(feedback.id), null);
+  assert.ok(fs.existsSync(path.join(dir, "trash", doc.id, "meta.json")));
+  assert.equal(new Store(dir).listDocuments().length, 0);
+  assert.equal(store.deleteDocument(doc.id), false);
+});

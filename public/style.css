@@ -32,6 +32,7 @@ button[disabled] { border-style: dashed; color: #777; }
 .docs li.reply { padding-left: 32px; }
 .docs a.title { font-size: 22px; text-decoration: none; display: block; }
 .docs .meta { font-size: 15px; }
+.docs button.delete { float: right; margin: 0 0 4px 12px; font-size: 15px; }
 .badge { display: inline-block; border: 1px solid #000; border-radius: 4px; padding: 0 6px; margin-right: 6px; font-size: 14px; }
 .badge.strong { background: #000; color: #fff; }
 .empty { font-size: 17px; }
