@@ -129,3 +129,7 @@ npm test
 ```
 
 To use a local checkout, run `npx /path/to/scribe-loop` (or `node /path/to/scribe-loop/bin/scribe-loop.mjs`) instead of `npx @motemen/scribe-loop`. To try exactly what would be published, run the tarball made by `npm pack` with `npx ./motemen-scribe-loop-0.1.0.tgz`.
+
+## License
+
+MIT

@@ -2,6 +2,16 @@
   "name": "@motemen/scribe-loop",
   "version": "0.1.0",
   "description": "Read AI agent documents on a handwriting device, write on them with a pen, and send the handwriting back",
+  "keywords": [
+    "mcp",
+    "claude-code",
+    "ai-agent",
+    "handwriting",
+    "e-ink",
+    "kindle-scribe"
+  ],
+  "license": "MIT",
+  "author": "motemen",
   "type": "module",
   "bin": {
     "scribe-loop": "bin/scribe-loop.mjs"
@@ -19,9 +29,13 @@
     "type": "git",
     "url": "git+https://github.com/motemen/scribe-loop.git"
   },
+  "homepage": "https://github.com/motemen/scribe-loop#readme",
+  "bugs": {
+    "url": "https://github.com/motemen/scribe-loop/issues"
+  },
   "scripts": {
     "start": "node bin/scribe-loop.mjs serve",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.mjs"
   },
   "optionalDependencies": {
     "playwright-core": "^1.65.1"

@@ -127,3 +127,7 @@ npm test
 ```
 
 手元のチェックアウトをそのまま使うときは、`npx @motemen/scribe-loop` の代わりに `npx /path/to/scribe-loop`（または `node /path/to/scribe-loop/bin/scribe-loop.mjs`）を使います。公開するパッケージと同じものを試すときは、`npm pack` で作った tarball を `npx ./motemen-scribe-loop-0.1.0.tgz` で実行します。
+
+## ライセンス
+
+MIT
